@@ -1,3 +1,4 @@
+import com.usebutton.sdk.Button
 package expo.modules.buttonsdk.example
 
 import android.app.Application
@@ -43,6 +44,12 @@ class MainApplication : Application(), ReactApplication {
     get() = getDefaultReactHost(this.applicationContext, reactNativeHost)
 
   override fun onCreate() {
+    // Button SDK configuration
+    if (BuildConfig.DEBUG) {
+    Button.debug().setLoggingEnabled(true);
+  }
+  Button.configure(this, "");
+
     super.onCreate()
     SoLoader.init(this, false)
     if (!BuildConfig.REACT_NATIVE_UNSTABLE_USE_RUNTIME_SCHEDULER_ALWAYS) {

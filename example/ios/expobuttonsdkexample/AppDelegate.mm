@@ -1,3 +1,4 @@
+#import <Button/Button.h>
 #import "AppDelegate.h"
 
 #import <React/RCTBundleURLProvider.h>
@@ -7,6 +8,8 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+  // Button SDK configuration
+  [Button configureWithApplicationId:@"example" completion:nil]
   self.moduleName = @"main";
 
   // You can add your custom initial props in the dictionary below.
