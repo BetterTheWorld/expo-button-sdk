@@ -1,44 +1,62 @@
 import ExpoModulesCore
+import Button
 
 public class ExpoButtonSdkModule: Module {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
-  public func definition() -> ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('ExpoButtonSdk')` in JavaScript.
-    Name("ExpoButtonSdk")
-
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants([
-      "PI": Double.pi
-    ])
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      return "Hello world! 👋"
+    public func definition() -> ModuleDefinition {
+        Name("ExpoButtonSdk")
+        AsyncFunction("startPurchasePath") { [weak self] (options: [Any], promise: Promise) in
+            guard let self = self,
+                  let options = options.first as? NSDictionary else {
+                promise.reject("InvalidArguments", "startPurchasePath expects a dictionary of options.")
+                return
+            }
+            
+            guard let urlString = options["url"] as? String,
+                  let url = URL(string: urlString) else {
+                promise.reject("InvalidURL", "The URL provided is invalid.")
+                return
+            }
+            
+#if DEBUG
+            print("expo-button-sdk startPurchasePath: url: \(url)")
+#endif
+            
+            let purchasePathExtension = PurchasePathExtensionCustom(options: options)
+            Button.purchasePath.extension = purchasePathExtension
+            let request = PurchasePathRequest(url: url)
+            
+            if let token = options["token"] as? String {
+#if DEBUG
+                print("expo-button-sdk startPurchasePath: token: \(token)")
+#endif
+                request.pubRef = token
+            }
+            
+            Button.purchasePath.fetch(request: request) { purchasePath, error in
+                if let error = error {
+                    promise.reject("FetchError", error.localizedDescription)
+                } else {
+                    purchasePath?.start()
+                    promise.resolve(nil)
+                }
+            }
+        }
+        
+        Function("clearAllData") {
+#if DEBUG
+            print("expo-button-sdk clearAllData")
+#endif
+            
+            Button.clearAllData()
+        }
+        
+        
+        Function("setIdentifier") { (identifier: String) in
+#if DEBUG
+            print("react-native-button-sdk setIdentifier \(identifier)")
+#endif
+            
+            Button.user.setIdentifier(identifier)
+        }
     }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { (value: String) in
-      // Send an event to JavaScript.
-      self.sendEvent("onChange", [
-        "value": value
-      ])
-    }
-
-    // Enables the module to be used as a native view. Definition components that are accepted as part of the
-    // view definition: Prop, Events.
-    View(ExpoButtonSdkView.self) {
-      // Defines a setter for the `name` prop.
-      Prop("name") { (view: ExpoButtonSdkView, prop: String) in
-        print(prop)
-      }
-    }
-  }
 }

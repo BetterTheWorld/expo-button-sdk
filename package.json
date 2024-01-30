@@ -30,6 +30,7 @@
   "homepage": "https://github.com/ddiazFG/expo-button-sdk#readme",
   "dependencies": {},
   "devDependencies": {
+    "@tsconfig/node19": "^19.1.2",
     "@types/react": "^18.0.25",
     "expo-module-scripts": "^3.4.0",
     "expo-modules-core": "^1.11.8"
