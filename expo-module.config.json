@@ -1,0 +1,10 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["ExpoButtonSdkModule"],
+    "appDelegateSubscribers": ["AppDelegate"]
+  },
+  "android": {
+    "modules": ["expo.modules.buttonsdk.ExpoButtonSdkModule"]
+  }
+}
