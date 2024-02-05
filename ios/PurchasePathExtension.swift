@@ -2,7 +2,6 @@ import ExpoModulesCore
 import Button
 
 class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
-    private var hasInitialized = false
     
     var headerTitle: String?
     var headerSubtitle: String?
@@ -26,13 +25,11 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
     }
+
     
-    func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
-        guard !hasInitialized else { return }
-        
-        
+    @objc func browserDidInitialize(_ browser: BrowserInterface) {
 #if DEBUG
-        print("react-native-button-sdk browser")
+        print("expo-button-sdk browserDidInitialize")
 #endif
         
         browser.header.title.text = self.headerTitle
@@ -43,28 +40,11 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.header.tintColor = self.headerTintColor
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
-                
-        hasInitialized = true
-    }
-    
-    // not working
-    func browserDidInitialize(browser: BrowserInterface) {
-#if DEBUG
-        print("react-native-button-sdk browserDidInitialize")
-#endif
-    }
-    
-    // not working
-    func browserWillNavigate(browser: BrowserInterface) {
-#if DEBUG
-        print("react-native-button-sdk browserWillNavigate")
-#endif
     }
     
     func browserDidClose() {
-        hasInitialized = false
 #if DEBUG
-        print("react-native-button-sdk browserDidClose")
+        print("expo-button-sdk browserDidClose")
 #endif
     }
     
