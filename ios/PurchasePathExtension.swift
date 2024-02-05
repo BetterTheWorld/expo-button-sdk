@@ -43,18 +43,18 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.header.tintColor = self.headerTintColor
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
-        
-        hasInitialized = false
-        
+                
+        hasInitialized = true
     }
     
+    // not working
     func browserDidInitialize(browser: BrowserInterface) {
 #if DEBUG
         print("react-native-button-sdk browserDidInitialize")
 #endif
     }
     
-    
+    // not working
     func browserWillNavigate(browser: BrowserInterface) {
 #if DEBUG
         print("react-native-button-sdk browserWillNavigate")

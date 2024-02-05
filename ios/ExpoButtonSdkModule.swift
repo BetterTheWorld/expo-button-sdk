@@ -20,6 +20,9 @@ public class ExpoButtonSdkModule: Module {
 #if DEBUG
             print("expo-button-sdk startPurchasePath: url: \(url)")
 #endif
+            let browserConfig = BrowserConfig()
+            browserConfig.title = options["headerTitle"] as? String
+            browserConfig.subtitle = options["headerSubtitle"] as? String
 
             let purchasePathExtension = PurchasePathExtensionCustom(options: options)
             Button.purchasePath.extension = purchasePathExtension
