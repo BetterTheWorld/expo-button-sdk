@@ -2,6 +2,8 @@ import ExpoModulesCore
 import Button
 
 class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
+    private var hasInitialized = false
+    
     var headerTitle: String?
     var headerSubtitle: String?
     var headerTitleColor: UIColor?
@@ -10,20 +12,29 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var headerTintColor: UIColor?
     var footerBackgroundColor: UIColor?
     var footerTintColor: UIColor?
-
+    
     init(options: NSDictionary) {
         super.init()
-        self.headerTitle = RCTConvert.nsString(options["headerTitle"])
-        self.headerSubtitle = RCTConvert.nsString(options["headerSubtitle"])
-        self.headerTitleColor = RCTConvert.uiColor(options["headerTitleColor"])
-        self.headerSubtitleColor = RCTConvert.uiColor(options["headerSubtitleColor"])
-        self.headerBackgroundColor = RCTConvert.uiColor(options["headerBackgroundColor"])
-        self.headerTintColor = RCTConvert.uiColor(options["headerTintColor"])
-        self.footerBackgroundColor = RCTConvert.uiColor(options["footerBackgroundColor"])
-        self.footerTintColor = RCTConvert.uiColor(options["footerTintColor"])
+        self.headerTitle = options["headerTitle"] as? String
+        self.headerSubtitle = options["headerSubtitle"] as? String
+        
+        // Assuming color values are provided as hex strings:
+        self.headerTitleColor = (options["headerTitleColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.headerSubtitleColor = (options["headerSubtitleColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.headerBackgroundColor = (options["headerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.headerTintColor = (options["headerTintColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
     }
-
-    func browserDidInitialize(browser: BrowserInterface) {
+    
+    func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
+        guard !hasInitialized else { return }
+        
+        
+#if DEBUG
+        print("react-native-button-sdk browser")
+#endif
+        
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
         browser.header.title.color = self.headerTitleColor
@@ -32,15 +43,73 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.header.tintColor = self.headerTintColor
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
+        
+        hasInitialized = false
+        
     }
-
+    
+    func browserDidInitialize(browser: BrowserInterface) {
+#if DEBUG
+        print("react-native-button-sdk browserDidInitialize")
+#endif
+    }
+    
+    
     func browserWillNavigate(browser: BrowserInterface) {
-        browser.hideTopCard()
+#if DEBUG
+        print("react-native-button-sdk browserWillNavigate")
+#endif
     }
-
+    
     func browserDidClose() {
-        #if DEBUG
+        hasInitialized = false
+#if DEBUG
         print("react-native-button-sdk browserDidClose")
-        #endif
+#endif
+    }
+    
+    
+    // Utility to convert hex string to UIColor
+    func colorFromHex(_ hex: String) -> UIColor? {
+        var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
+        
+        var rgb: UInt64 = 0
+        
+        Scanner(string: hexSanitized).scanHexInt64(&rgb)
+        
+        let red = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
+        let green = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
+        let blue = CGFloat(rgb & 0x0000FF) / 255.0
+        
+        return UIColor(red: red, green: green, blue: blue, alpha: 1.0)
+    }
+}
+
+extension UIColor {
+    convenience init?(hex: String) {
+        let r, g, b, a: CGFloat
+        
+        if hex.hasPrefix("#") {
+            let start = hex.index(hex.startIndex, offsetBy: 1)
+            let hexColor = String(hex[start...])
+            
+            if hexColor.count == 6 {
+                let scanner = Scanner(string: hexColor)
+                var hexNumber: UInt64 = 0
+                
+                if scanner.scanHexInt64(&hexNumber) {
+                    r = CGFloat((hexNumber & 0xff0000) >> 16) / 255
+                    g = CGFloat((hexNumber & 0x00ff00) >> 8) / 255
+                    b = CGFloat(hexNumber & 0x0000ff) / 255
+                    a = 1.0
+                    
+                    self.init(red: r, green: g, blue: b, alpha: a)
+                    return
+                }
+            }
+        }
+        
+        return nil
     }
 }

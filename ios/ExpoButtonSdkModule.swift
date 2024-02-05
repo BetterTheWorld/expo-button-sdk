@@ -20,7 +20,7 @@ public class ExpoButtonSdkModule: Module {
 #if DEBUG
             print("expo-button-sdk startPurchasePath: url: \(url)")
 #endif
-            
+
             let purchasePathExtension = PurchasePathExtensionCustom(options: options)
             Button.purchasePath.extension = purchasePathExtension
             let request = PurchasePathRequest(url: url)
@@ -49,15 +49,7 @@ public class ExpoButtonSdkModule: Module {
             
             Button.clearAllData()
         }
-        
-        
-        Function("setIdentifier") { (identifier: String) in
-#if DEBUG
-            print("react-native-button-sdk setIdentifier \(identifier)")
-#endif
-            
-            Button.user.setIdentifier(identifier)
-        }
+
         
         Function("setIdentifier") { (identifier: String) in
 #if DEBUG

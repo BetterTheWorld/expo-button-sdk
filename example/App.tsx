@@ -27,14 +27,14 @@ export default function App() {
             }
 
             startPurchasePath({
-              footerBackgroundColor: "#48B1BF",
-              footerTintColor: "#FFFFFF",
-              headerBackgroundColor: "#48B1BF",
-              headerSubtitle: "Gives 1%",
-              headerSubtitleColor: "#FFFFFF",
-              headerTintColor: "#FFFFFF",
-              headerTitle: "Gap",
-              headerTitleColor: "#FFFFFF",
+              footerBackgroundColor: "#FF3453",
+              footerTintColor: "#FF3453",
+              headerBackgroundColor: "#FF3453",
+              headerSubtitle: "Gives 10%",
+              headerSubtitleColor: "#FFE599",
+              headerTintColor: "#",
+              headerTitle: "Gapo",
+              headerTitleColor: "#347796",
               url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
               token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
             });
