@@ -17,18 +17,67 @@ For bare React Native projects, you must ensure that you have [installed and con
 
 ### Add the package to your npm dependencies
 
+npm
 ```
-npm install expo-button-sdk
+npm install @flipgive/expo-button-sdk
 ```
+
+yarn
+```
+yarn add @flipgive/expo-button-sdk
+```
+
+pnpm
+```
+pnpm add @flipgive/expo-button-sdk
+```
+
+# Run in bare React Native projects
 
 ### Configure for iOS
 
 Run `npx pod-install` after installing the npm package.
 
 
-### Configure for Android
+# Run in expo dev client
+
+`npx expo prebuild --clean`
+
+and
+
+`npx expo run:ios` or `npx expo run:android`
 
 
+# API
+
+
+```typescript
+import {
+  startPurchasePath,
+  clearAllData,
+  setIdentifier,
+} from "@flipgive/expo-button-sdk";
+
+// Fetch a purchase path from Button and start the browser
+startPurchasePath({
+  url:                   "https://the.button.url", // required
+  token:                 "my-tracking-token", // required
+  headerTitle:           "My Button Browser Title",
+  headerSubtitle:        "My Button Browser Subtitle",
+  headerTitleColor:      "#FFFFF", // only hexadecimal format accepted
+  headerSubtitleColor:   "#FFFFF",
+  headerBackgroundColor: "#FFFFF",
+  headerTintColor:       "#FFFFF",
+  footerBackgroundColor: "#FFFFF",
+  footerTintColor:       "#FFFFF"
+});
+
+// On user login
+setIdentifier(id); // id required
+
+// On user logout
+clearAllData();
+```
 
 # Contributing
 

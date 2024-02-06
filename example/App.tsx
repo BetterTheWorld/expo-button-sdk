@@ -2,7 +2,7 @@ import {
   startPurchasePath,
   clearAllData,
   setIdentifier,
-} from "expo-button-sdk";
+} from "@flipgive/expo-button-sdk";
 import {
   Button,
   SafeAreaView,

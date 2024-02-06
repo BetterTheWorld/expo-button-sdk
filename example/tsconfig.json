@@ -3,8 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "expo-button-sdk": ["../src/index"],
-      "expo-button-sdk/*": ["../src/*"]
+      "@flipgive/expo-button-sdk": ["../src/index"],
+      "@flipgive/expo-button-sdk/*": ["../src/*"]
     }
   }
 }

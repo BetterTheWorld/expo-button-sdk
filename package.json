@@ -1,5 +1,5 @@
 {
-  "name": "expo-button-sdk",
+  "name": "@flipgive/expo-button-sdk",
   "version": "0.1.0",
   "description": "Button sdk for expo",
   "main": "build/index.js",
@@ -21,13 +21,13 @@
     "expo-button-sdk",
     "ExpoButtonSdk"
   ],
-  "repository": "https://github.com/ddiazFG/expo-button-sdk",
+  "repository": "https://github.com/BetterTheWorld/expo-button-sdk",
   "bugs": {
-    "url": "https://github.com/ddiazFG/expo-button-sdk/issues"
+    "url": "https://github.com/BetterTheWorld/expo-button-sdk/issues"
   },
-  "author": "Noroboto <ddiaz@flipgive.com> (https://github.com/ddiazFG)",
+  "author": "flipgive",
   "license": "MIT",
-  "homepage": "https://github.com/ddiazFG/expo-button-sdk#readme",
+  "homepage": "https://github.com/BetterTheWorld/expo-button-sdk#readme",
   "dependencies": {},
   "devDependencies": {
     "@tsconfig/node19": "^19.1.2",

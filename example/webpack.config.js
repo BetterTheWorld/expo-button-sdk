@@ -6,7 +6,7 @@ module.exports = async (env, argv) => {
     {
       ...env,
       babel: {
-        dangerouslyAddModulePathsToTranspile: ['expo-button-sdk'],
+        dangerouslyAddModulePathsToTranspile: ['@flipgive/expo-button-sdk'],
       },
     },
     argv
