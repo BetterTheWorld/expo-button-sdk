@@ -2,6 +2,10 @@ import ExpoModulesCore
 import Button
 
 public class ExpoButtonSdkModule: Module {
+    public static func requiresMainQueueSetup() -> Bool {
+            return true
+        }
+    
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
         AsyncFunction("startPurchasePath") { [weak self] (options: [Any], promise: Promise) in
