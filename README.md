@@ -65,12 +65,12 @@ startPurchasePath({
   token:                 "my-tracking-token", // required
   headerTitle:           "My Button Browser Title",
   headerSubtitle:        "My Button Browser Subtitle",
-  headerTitleColor:      "#FFFFF", // only hexadecimal format accepted
-  headerSubtitleColor:   "#FFFFF",
-  headerBackgroundColor: "#FFFFF",
-  headerTintColor:       "#FFFFF",
-  footerBackgroundColor: "#FFFFF",
-  footerTintColor:       "#FFFFF"
+  headerTitleColor:      "#FFFFFF", // only hexadecimal (6 CHARS) format accepted
+  headerSubtitleColor:   "#FFFFFF",
+  headerBackgroundColor: "#FFFFFF",
+  headerTintColor:       "#FFFFFF",
+  footerBackgroundColor: "#FFFFFF",
+  footerTintColor:       "#FFFFFF"
 });
 
 // On user login
