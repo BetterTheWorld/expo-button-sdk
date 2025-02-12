@@ -11,7 +11,7 @@ import {
   Text,
 } from "react-native";
 
-export default function App() {
+export function Example() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.parentContainer}>
@@ -61,6 +61,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10
+    gap: 10,
   },
 });
