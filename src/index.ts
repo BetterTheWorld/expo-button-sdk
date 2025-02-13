@@ -1,4 +1,8 @@
-import { Identifier, StartPurchasePathOptions } from "./ExpoButtonSdk.types";
+import {
+  Identifier,
+  StartPurchasePathOptions,
+  ButtonSDKStatus,
+} from "./ExpoButtonSdk.types";
 import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 
 export async function startPurchasePath(options: StartPurchasePathOptions) {
@@ -11,4 +15,8 @@ export function clearAllData() {
 
 export function setIdentifier(id: Identifier) {
   return ExpoButtonSdkModule.setIdentifier(id);
+}
+
+export async function initializeSDK(): Promise<boolean> {
+  return await ExpoButtonSdkModule.initializeSDK();
 }

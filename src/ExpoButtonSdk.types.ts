@@ -12,3 +12,7 @@ export interface StartPurchasePathOptions {
 }
 
 export type Identifier = string;
+
+export interface ButtonSDKStatus {
+  isInitialized: boolean;
+}

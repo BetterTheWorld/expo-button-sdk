@@ -2,8 +2,11 @@ import {
   startPurchasePath,
   clearAllData,
   setIdentifier,
+  initializeSDK,
 } from "@flipgive/expo-button-sdk";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Button,
   SafeAreaView,
   ScrollView,
@@ -12,6 +15,30 @@ import {
 } from "react-native";
 
 export function Example() {
+  const [isSDKInitialized, setIsSDKInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  console.info("isSDKInitialized", isSDKInitialized);
+
+  useEffect(() => {
+    async function initialize() {
+      try {
+        await initializeSDK();
+        setIsSDKInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize Button SDK:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    initialize();
+  }, []);
+
+  if (isLoading && !isSDKInitialized) {
+    return <ActivityIndicator />;
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.parentContainer}>
