@@ -2,7 +2,7 @@ import ExpoModulesCore
 import Button
 
 public class ButtonSDKDelegate: ExpoAppDelegateSubscriber {
-    private static var isConfigured = false
+    static var isConfigured = false
     
     private func configureButtonSDK() {
         guard !ButtonSDKDelegate.isConfigured else { return }

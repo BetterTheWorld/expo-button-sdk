@@ -8,10 +8,37 @@ public class ExpoButtonSdkModule: Module {
     
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
+        AsyncFunction("initializeSDK") { (promise: Promise) in
+            if ButtonSDKDelegate.isConfigured {
+                promise.resolve(true)
+                return
+            }
+            
+            if let buttonAppID = Bundle.main.object(forInfoDictionaryKey: "ButtonSdkAppId") as? String {
+                Button.configure(applicationId: buttonAppID) { error in
+                    if let error = error {
+                        promise.reject("InitError", error.localizedDescription)
+                    } else {
+                        print("🟢 Success ButtonSdk: Configuration successful. [initializeSDK]")
+                        ButtonSDKDelegate.isConfigured = true
+                        promise.resolve(true)
+                    }
+                }
+            } else {
+                promise.reject("ConfigError", "ButtonSdkAppId not found in Info.plist")
+            }
+        }
+        
         AsyncFunction("startPurchasePath") { [weak self] (options: [Any], promise: Promise) in
             guard let self = self,
                   let options = options.first as? NSDictionary else {
                 promise.reject("InvalidArguments", "startPurchasePath expects a dictionary of options.")
+                return
+            }
+            
+            // Ensure Button SDK is configured
+            guard ButtonSDKDelegate.isConfigured else {
+                promise.reject("SDKNotConfigured", "Button SDK must be configured before calling startPurchasePath")
                 return
             }
             
