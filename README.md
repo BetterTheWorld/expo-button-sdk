@@ -1,6 +1,6 @@
 # expo-button-sdk
 
-Button sdk for expo
+Button sdk for expo https://developer.usebutton.com/
 
 # Installation in managed Expo projects
 
