@@ -1,3 +1,11 @@
+export interface ExitConfirmationConfig {
+  enabled: boolean;
+  title?: string;
+  message?: string;
+  stayButtonLabel?: string;
+  leaveButtonLabel?: string;
+}
+
 export interface StartPurchasePathOptions {
   url: string;
   token: string;
@@ -9,9 +17,7 @@ export interface StartPurchasePathOptions {
   headerTintColor?: string;
   footerBackgroundColor?: string;
   footerTintColor?: string;
-  showExitConfirmation?: boolean;
-  alertTitle?: string;
-  alertMessage?: string;
+  exitConfirmation?: ExitConfirmationConfig;
 }
 
 export type Identifier = string;

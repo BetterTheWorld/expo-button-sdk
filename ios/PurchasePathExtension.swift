@@ -11,9 +11,12 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var headerTintColor: UIColor?
     var footerBackgroundColor: UIColor?
     var footerTintColor: UIColor?
-    var showExitConfirmation: Bool = false
-    var alertTitle: String?
-    var alertMessage: String?
+    // Exit confirmation configuration
+    var exitConfirmationEnabled: Bool = false
+    var exitConfirmationTitle: String?
+    var exitConfirmationMessage: String?
+    var stayButtonLabel: String?
+    var leaveButtonLabel: String?
     
     init(options: NSDictionary) {
         super.init()
@@ -27,9 +30,15 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.headerTintColor = (options["headerTintColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
-        self.showExitConfirmation = options["showExitConfirmation"] as? Bool ?? false
-        self.alertTitle = options["alertTitle"] as? String
-        self.alertMessage = options["alertMessage"] as? String
+        
+        // Parse exit confirmation config
+        if let exitConfirmationConfig = options["exitConfirmation"] as? NSDictionary {
+            self.exitConfirmationEnabled = exitConfirmationConfig["enabled"] as? Bool ?? false
+            self.exitConfirmationTitle = exitConfirmationConfig["title"] as? String
+            self.exitConfirmationMessage = exitConfirmationConfig["message"] as? String
+            self.stayButtonLabel = exitConfirmationConfig["stayButtonLabel"] as? String
+            self.leaveButtonLabel = exitConfirmationConfig["leaveButtonLabel"] as? String
+        }
     }
 
     
@@ -56,11 +65,17 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     
     func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {
 #if DEBUG
-        print("expo-button-sdk shouldCloseBrowser called, showExitConfirmation: \(showExitConfirmation)")
+        print("expo-button-sdk shouldCloseBrowser called, exitConfirmationEnabled: \(exitConfirmationEnabled)")
 #endif
-        if showExitConfirmation {
-            // Use the new BrowserAlertManager
-            BrowserAlertManager.showExitConfirmationAlert(browser: browser, title: self.alertTitle, message: self.alertMessage) { shouldLeave in
+        if exitConfirmationEnabled {
+            // Use the new BrowserAlertManager with configurable labels
+            BrowserAlertManager.showExitConfirmationAlert(
+                browser: browser, 
+                title: self.exitConfirmationTitle, 
+                message: self.exitConfirmationMessage,
+                stayButtonLabel: self.stayButtonLabel,
+                leaveButtonLabel: self.leaveButtonLabel
+            ) { shouldLeave in
                 if shouldLeave {
                     browser.dismiss()
                 }

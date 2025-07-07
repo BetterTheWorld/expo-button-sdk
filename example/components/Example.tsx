@@ -64,7 +64,14 @@ export function Example() {
               headerTitleColor: "#347796",
               url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
               token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
-              showExitConfirmation: true,
+              exitConfirmation: {
+                enabled: true,
+                title: "Are you sure you want to leave?",
+                message:
+                  "You might miss out on exclusive offers and lose your progress.",
+                stayButtonLabel: "Stay",
+                leaveButtonLabel: "Leave",
+              },
             });
           }}
         />

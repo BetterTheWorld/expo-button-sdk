@@ -66,9 +66,22 @@ class ExpoButtonSdkModule() : Module() {
 
   class CustomPurchasePathExtension(private val activity: Activity, private val options: Map<String, Any>) : PurchasePathExtension {
 
-    private val showExitConfirmation: Boolean = options["showExitConfirmation"] as? Boolean ?: false
-    private val alertTitle: String = options["alertTitle"] as? String ?: "Are you sure you want to leave?"
-    private val alertMessage: String = options["alertMessage"] as? String ?: "You may lose your progress and any available deals."
+    // Exit confirmation configuration
+    private val exitConfirmationEnabled: Boolean
+    private val exitConfirmationTitle: String
+    private val exitConfirmationMessage: String
+    private val stayButtonLabel: String
+    private val leaveButtonLabel: String
+    
+    init {
+        // Parse exit confirmation config
+        val exitConfirmationConfig = options["exitConfirmation"] as? Map<String, Any>
+        exitConfirmationEnabled = exitConfirmationConfig?.get("enabled") as? Boolean ?: false
+        exitConfirmationTitle = exitConfirmationConfig?.get("title") as? String ?: "Are you sure you want to leave?"
+        exitConfirmationMessage = exitConfirmationConfig?.get("message") as? String ?: "You may lose your progress and any available deals."
+        stayButtonLabel = exitConfirmationConfig?.get("stayButtonLabel") as? String ?: "Stay"
+        leaveButtonLabel = exitConfirmationConfig?.get("leaveButtonLabel") as? String ?: "Leave"
+    }
 
     override fun onInitialized(browser: BrowserInterface) {
       with(browser.header) {
@@ -107,11 +120,20 @@ class ExpoButtonSdkModule() : Module() {
     override fun onProductNavigate(browser: BrowserInterface, page: ProductPage) {}
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
     override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
-      if (showExitConfirmation) {
-        ConfirmationDialog.show(activity, alertTitle, alertMessage, browserInterface)
-        return false
+      Log.d("CustomPurchasePathExtension", "onShouldClose called, exitConfirmationEnabled: $exitConfirmationEnabled")
+      
+      if (exitConfirmationEnabled) {
+        ConfirmationDialog.show(
+          activity, 
+          exitConfirmationTitle, 
+          exitConfirmationMessage, 
+          stayButtonLabel, 
+          leaveButtonLabel, 
+          browserInterface
+        )
+        return false // Prevent automatic closure
       }
-      return true
+      return true // Allow closure
     }
 
     override fun onClosed() {}

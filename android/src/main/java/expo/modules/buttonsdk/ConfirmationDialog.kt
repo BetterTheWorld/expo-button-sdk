@@ -22,6 +22,8 @@ object ConfirmationDialog {
         context: Context,
         title: String,
         message: String,
+        stayButtonLabel: String,
+        leaveButtonLabel: String,
         browser: BrowserInterface
     ) {
 
@@ -35,7 +37,7 @@ object ConfirmationDialog {
                     return@post
                 }
 
-                val dialogView = createDialogView(context, title, message, browser, container)
+                val dialogView = createDialogView(context, title, message, stayButtonLabel, leaveButtonLabel, browser, container)
                 
                 // Add to container
                 container.addView(dialogView)
@@ -51,6 +53,8 @@ object ConfirmationDialog {
         context: Context,
         title: String,
         message: String,
+        stayButtonLabel: String,
+        leaveButtonLabel: String,
         browser: BrowserInterface,
         container: ViewGroup
     ): View {
@@ -102,7 +106,7 @@ object ConfirmationDialog {
         
         // Stay button
         val stayButton = Button(context).apply {
-            text = "Stay"
+            text = stayButtonLabel
             setOnClickListener {
                 Log.d("ConfirmationDialog", "User chose to stay")
                 container.removeView(dialogContainer)
@@ -117,7 +121,7 @@ object ConfirmationDialog {
         
         // Leave button
         val leaveButton = Button(context).apply {
-            text = "Leave"
+            text = leaveButtonLabel
             setOnClickListener {
                 Log.d("ConfirmationDialog", "User chose to leave")
                 container.removeView(dialogContainer)

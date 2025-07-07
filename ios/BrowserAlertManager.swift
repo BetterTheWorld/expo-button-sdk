@@ -3,7 +3,14 @@ import Button
 
 class BrowserAlertManager {
     
-    static func showExitConfirmationAlert(browser: BrowserInterface, title: String?, message: String?, completion: @escaping (Bool) -> Void) {
+    static func showExitConfirmationAlert(
+        browser: BrowserInterface, 
+        title: String?, 
+        message: String?,
+        stayButtonLabel: String?,
+        leaveButtonLabel: String?,
+        completion: @escaping (Bool) -> Void
+    ) {
 #if DEBUG
         print("expo-button-sdk showExitConfirmationAlert called")
 #endif
@@ -15,11 +22,11 @@ class BrowserAlertManager {
                 preferredStyle: .alert
             )
             
-            alert.addAction(UIAlertAction(title: "Stay", style: .cancel) { _ in
+            alert.addAction(UIAlertAction(title: stayButtonLabel ?? "Stay", style: .cancel) { _ in
                 completion(false) // User chose to stay
             })
             
-            alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { _ in
+            alert.addAction(UIAlertAction(title: leaveButtonLabel ?? "Leave", style: .destructive) { _ in
                 completion(true) // User chose to leave
             })
             
