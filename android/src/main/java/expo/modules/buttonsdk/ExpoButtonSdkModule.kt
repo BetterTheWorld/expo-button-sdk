@@ -3,6 +3,7 @@ package expo.modules.buttonsdk
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.Promise
+import android.app.Activity
 
 import android.util.Log
 import android.graphics.Color
@@ -14,6 +15,12 @@ class ExpoButtonSdkModule() : Module() {
   override fun definition() = ModuleDefinition {
 
     Name("ExpoButtonSdk")
+
+    AsyncFunction("initializeSDK") { promise: Promise ->
+      // The Button SDK for Android initializes automatically via a ContentProvider.
+      // This function is provided for API consistency with the iOS module.
+      promise.resolve(true)
+    }
 
     Function("setIdentifier") { identifier: String ->
       Log.d("ButtonSdk", "setIdentifier: $identifier")
@@ -39,10 +46,9 @@ class ExpoButtonSdkModule() : Module() {
       Button.purchasePath().fetch(request, object : PurchasePathListener {
         override fun onComplete(purchasePath: PurchasePath?, throwable: Throwable?) {
           if (purchasePath != null) {
-            Button.purchasePath().extension = CustomPurchasePathExtension(params)
-            var activity = appContext.activityProvider?.currentActivity
-
+            val activity = appContext.activityProvider?.currentActivity
             if (activity != null) {
+              Button.purchasePath().extension = CustomPurchasePathExtension(activity, params)
               purchasePath.start(activity) // Correct context access
             } else {
               promise.reject("ERROR", "Not context for purchasePath", throwable)
@@ -58,7 +64,11 @@ class ExpoButtonSdkModule() : Module() {
     }
   }
 
-  class CustomPurchasePathExtension(private val options: Map<String, Any>) : PurchasePathExtension {
+  class CustomPurchasePathExtension(private val activity: Activity, private val options: Map<String, Any>) : PurchasePathExtension {
+
+    private val showExitConfirmation: Boolean = options["showExitConfirmation"] as? Boolean ?: false
+    private val alertTitle: String = options["alertTitle"] as? String ?: "Are you sure you want to leave?"
+    private val alertMessage: String = options["alertMessage"] as? String ?: "You may lose your progress and any available deals."
 
     override fun onInitialized(browser: BrowserInterface) {
       with(browser.header) {
@@ -96,6 +106,14 @@ class ExpoButtonSdkModule() : Module() {
     override fun onPageNavigate(browser: BrowserInterface, page: BrowserPage) {}
     override fun onProductNavigate(browser: BrowserInterface, page: ProductPage) {}
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
+    override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
+      if (showExitConfirmation) {
+        ConfirmationDialog.show(activity, alertTitle, alertMessage, browserInterface)
+        return false
+      }
+      return true
+    }
+
     override fun onClosed() {}
   }
 }
