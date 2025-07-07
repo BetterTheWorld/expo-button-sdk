@@ -12,6 +12,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var footerBackgroundColor: UIColor?
     var footerTintColor: UIColor?
     var showExitConfirmation: Bool = false
+    var alertTitle: String?
+    var alertMessage: String?
     
     init(options: NSDictionary) {
         super.init()
@@ -26,6 +28,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
         self.showExitConfirmation = options["showExitConfirmation"] as? Bool ?? false
+        self.alertTitle = options["alertTitle"] as? String
+        self.alertMessage = options["alertMessage"] as? String
     }
 
     
@@ -56,7 +60,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #endif
         if showExitConfirmation {
             // Use the new BrowserAlertManager
-            BrowserAlertManager.showExitConfirmationAlert(browser: browser) { shouldLeave in
+            BrowserAlertManager.showExitConfirmationAlert(browser: browser, title: self.alertTitle, message: self.alertMessage) { shouldLeave in
                 if shouldLeave {
                     browser.dismiss()
                 }

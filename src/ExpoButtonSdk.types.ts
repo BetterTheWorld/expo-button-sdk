@@ -10,6 +10,8 @@ export interface StartPurchasePathOptions {
   footerBackgroundColor?: string;
   footerTintColor?: string;
   showExitConfirmation?: boolean;
+  alertTitle?: string;
+  alertMessage?: string;
 }
 
 export type Identifier = string;

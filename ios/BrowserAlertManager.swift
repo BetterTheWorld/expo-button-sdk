@@ -3,15 +3,15 @@ import Button
 
 class BrowserAlertManager {
     
-    static func showExitConfirmationAlert(browser: BrowserInterface, completion: @escaping (Bool) -> Void) {
+    static func showExitConfirmationAlert(browser: BrowserInterface, title: String?, message: String?, completion: @escaping (Bool) -> Void) {
 #if DEBUG
         print("expo-button-sdk showExitConfirmationAlert called")
 #endif
         
         DispatchQueue.main.async {
             let alert = UIAlertController(
-                title: "Are you sure you want to leave?",
-                message: "You may lose your progress and any available deals.",
+                title: title ?? "Are you sure you want to leave?",
+                message: message ?? "You may lose your progress and any available deals.",
                 preferredStyle: .alert
             )
             
