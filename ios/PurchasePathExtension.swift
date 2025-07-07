@@ -11,6 +11,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var headerTintColor: UIColor?
     var footerBackgroundColor: UIColor?
     var footerTintColor: UIColor?
+    var showExitConfirmation: Bool = false
     
     init(options: NSDictionary) {
         super.init()
@@ -24,6 +25,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.headerTintColor = (options["headerTintColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
+        self.showExitConfirmation = options["showExitConfirmation"] as? Bool ?? false
     }
 
     
@@ -46,6 +48,22 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #if DEBUG
         print("expo-button-sdk browserDidClose")
 #endif
+    }
+    
+    func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {
+#if DEBUG
+        print("expo-button-sdk shouldCloseBrowser called, showExitConfirmation: \(showExitConfirmation)")
+#endif
+        if showExitConfirmation {
+            // Use the new BrowserAlertManager
+            BrowserAlertManager.showExitConfirmationAlert(browser: browser) { shouldLeave in
+                if shouldLeave {
+                    browser.dismiss()
+                }
+            }
+            return false // Always prevent automatic closure
+        }
+        return true
     }
     
     

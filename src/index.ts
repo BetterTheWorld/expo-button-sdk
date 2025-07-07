@@ -1,8 +1,4 @@
-import {
-  Identifier,
-  StartPurchasePathOptions,
-  ButtonSDKStatus,
-} from "./ExpoButtonSdk.types";
+import { Identifier, StartPurchasePathOptions } from "./ExpoButtonSdk.types";
 import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 
 export async function startPurchasePath(options: StartPurchasePathOptions) {

@@ -9,6 +9,7 @@ export interface StartPurchasePathOptions {
   headerTintColor?: string;
   footerBackgroundColor?: string;
   footerTintColor?: string;
+  showExitConfirmation?: boolean;
 }
 
 export type Identifier = string;
