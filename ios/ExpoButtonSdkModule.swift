@@ -2,12 +2,16 @@ import ExpoModulesCore
 import Button
 
 public class ExpoButtonSdkModule: Module {
+    private var currentPurchasePathExtension: PurchasePathExtensionCustom?
+    
     public static func requiresMainQueueSetup() -> Bool {
             return true
         }
     
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
+        
+        Events("onPromotionClick")
         AsyncFunction("initializeSDK") { (promise: Promise) in
             if ButtonSDKDelegate.isConfigured {
                 promise.resolve(true)
@@ -53,6 +57,29 @@ public class ExpoButtonSdkModule: Module {
 #endif
 
             let purchasePathExtension = PurchasePathExtensionCustom(options: options)
+            
+            // Store reference for potential cleanup
+            self.currentPurchasePathExtension = purchasePathExtension
+            
+            // Set up promotion click callback with immediate browser dismiss
+            purchasePathExtension.setPromotionClickCallback { [weak self] promotionId, browser in
+
+                // Close browser immediately if needed
+                if purchasePathExtension.closeOnPromotionClick {
+                    browser?.dismiss()
+                } else {
+                    // Hide loader since we're not navigating to a new promotion
+                    GlobalLoaderManager.shared.hideLoader()
+                    print("🔄 Global loader hidden (closeOnPromotionClick=false)")
+                }
+
+                // Send event to JavaScript
+                self?.sendEvent("onPromotionClick", [
+                    "promotionId": promotionId,
+                    "closeOnPromotionClick": purchasePathExtension.closeOnPromotionClick
+                ])
+            }
+            
             Button.purchasePath.extension = purchasePathExtension
             let request = PurchasePathRequest(url: url)
             
@@ -88,6 +115,12 @@ public class ExpoButtonSdkModule: Module {
 #endif
             
             Button.user.setIdentifier(identifier)
+        }
+        
+        Function("closePurchasePath") {
+#if DEBUG
+            print("expo-button-sdk closePurchasePath")
+#endif
         }
 
     }

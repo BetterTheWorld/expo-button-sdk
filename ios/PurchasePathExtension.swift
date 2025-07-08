@@ -11,6 +11,15 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var headerTintColor: UIColor?
     var footerBackgroundColor: UIColor?
     var footerTintColor: UIColor?
+    // Exit confirmation configuration
+    var exitConfirmationEnabled: Bool = false
+    var exitConfirmationTitle: String?
+    var exitConfirmationMessage: String?
+    var stayButtonLabel: String?
+    var leaveButtonLabel: String?
+    // Promotion manager
+    private var promotionManager: PromotionManager?
+    var closeOnPromotionClick: Bool = true
     
     init(options: NSDictionary) {
         super.init()
@@ -24,6 +33,33 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.headerTintColor = (options["headerTintColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
+        
+        // Parse exit confirmation config
+        if let exitConfirmationConfig = options["exitConfirmation"] as? NSDictionary {
+            self.exitConfirmationEnabled = exitConfirmationConfig["enabled"] as? Bool ?? false
+            self.exitConfirmationTitle = exitConfirmationConfig["title"] as? String
+            self.exitConfirmationMessage = exitConfirmationConfig["message"] as? String
+            self.stayButtonLabel = exitConfirmationConfig["stayButtonLabel"] as? String
+            self.leaveButtonLabel = exitConfirmationConfig["leaveButtonLabel"] as? String
+        }
+        
+        // Parse closeOnPromotionClick option (default: true)
+        self.closeOnPromotionClick = options["closeOnPromotionClick"] as? Bool ?? true
+        
+        // Initialize promotion manager if promotion data is provided
+        if let promotionData = options["promotionData"] as? NSDictionary {
+            self.promotionManager = PromotionManager(promotionData: promotionData, onPromotionClickCallback: { _, _ in })
+        }
+    }
+    
+    func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
+        promotionManager?.setOnPromotionClickCallback(callback)
+    }
+    
+    func closeBrowserIfNeeded(_ browser: BrowserInterface) {
+        if closeOnPromotionClick {
+            browser.dismiss()
+        }
     }
 
     
@@ -31,6 +67,10 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #if DEBUG
         print("expo-button-sdk browserDidInitialize")
 #endif
+        
+        // Hide any global loader when new browser initializes
+        GlobalLoaderManager.shared.hideLoader()
+        print("🔄 Global loader hidden on browser initialization")
         
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
@@ -40,6 +80,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.header.tintColor = self.headerTintColor
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
+        
+        // Setup promotions badge if available
+        promotionManager?.setupPromotionsBadge(for: browser)
     }
     
     func browserDidClose() {
@@ -48,6 +91,27 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #endif
     }
     
+    func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {
+#if DEBUG
+        print("expo-button-sdk shouldCloseBrowser called, exitConfirmationEnabled: \(exitConfirmationEnabled)")
+#endif
+        if exitConfirmationEnabled {
+            // Use the new BrowserAlertManager with configurable labels
+            BrowserAlertManager.showExitConfirmationAlert(
+                browser: browser, 
+                title: self.exitConfirmationTitle, 
+                message: self.exitConfirmationMessage,
+                stayButtonLabel: self.stayButtonLabel,
+                leaveButtonLabel: self.leaveButtonLabel
+            ) { shouldLeave in
+                if shouldLeave {
+                    browser.dismiss()
+                }
+            }
+            return false // Always prevent automatic closure
+        }
+        return true
+    }
     
     // Utility to convert hex string to UIColor
     func colorFromHex(_ hex: String) -> UIColor? {

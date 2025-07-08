@@ -11,9 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "expo.modules.buttonsdk.example"
@@ -27,11 +25,12 @@
     },
     "plugins": [
       [
-        "../app.plugin.js", 
+        "../app.plugin.js",
         {
           "iosAppId": "",
           "androidAppId": ""
-        }
+        },
+        "expo-router"
       ]
     ]
   }
