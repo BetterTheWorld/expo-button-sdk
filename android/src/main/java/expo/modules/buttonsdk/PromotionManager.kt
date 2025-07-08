@@ -154,22 +154,30 @@ class PromotionManager(
             setPadding(4, 0, 4, 0)
         }
         
-        // Count badge
+        // Count badge with perfect circular background
         val countView = TextView(context).apply {
             text = count.toString()
-            textSize = 12f
+            textSize = 11f // Slightly larger text
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(6, 2, 6, 2)
-            setBackgroundColor(Color.RED)
+            
+            // Create circular background
+            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.RED)
+            }
+            background = circularBackground
             
             val params = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                48, // Slightly larger circle
+                48  // Slightly larger circle
             ).apply {
                 setMargins(4, 0, 0, 0)
             }
             layoutParams = params
+            
+            // Add slight bottom padding for better vertical centering
+            setPadding(0, 0, 0, 2)
         }
         
         button.addView(iconView)
@@ -224,18 +232,25 @@ class PromotionManager(
         
         val countView = TextView(context).apply {
             text = count.toString()
-            textSize = 12f
+            textSize = 11f // Slightly larger text
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(8, 4, 8, 4)
-            setBackgroundColor(Color.RED)
             
-            // Make it circular-ish
+            // Create circular background
+            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.RED)
+            }
+            background = circularBackground
+            
             val params = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                48, // Slightly larger circle
+                48  // Slightly larger circle
             )
             layoutParams = params
+            
+            // Add slight bottom padding for better vertical centering
+            setPadding(0, 0, 0, 2)
         }
         
         promotionButton.addView(iconView)
@@ -272,23 +287,30 @@ class PromotionManager(
             gravity = Gravity.CENTER
         }
         
-        // Count badge
+        // Count badge with perfect circular background
         val countView = TextView(context).apply {
             text = count.toString()
-            textSize = 12f
+            textSize = 11f // Slightly larger text
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            setPadding(6, 2, 6, 2)
-            setBackgroundColor(Color.RED)
             
-            // Make it circular
+            // Create circular background
+            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(Color.RED)
+            }
+            background = circularBackground
+            
             val params = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                48, // Slightly larger circle
+                48  // Slightly larger circle
             ).apply {
                 setMargins(4, 0, 0, 0)
             }
             layoutParams = params
+            
+            // Add slight bottom padding for better vertical centering
+            setPadding(0, 0, 0, 2)
         }
         
         button.addView(iconView)

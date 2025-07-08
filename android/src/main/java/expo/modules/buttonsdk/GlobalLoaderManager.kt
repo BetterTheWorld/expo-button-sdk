@@ -2,6 +2,7 @@ package expo.modules.buttonsdk
 
 import android.app.Activity
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -76,12 +77,21 @@ class GlobalLoaderManager private constructor() {
             isFocusable = true
         }
         
-        // Loader container
+        // Loader container with custom rounded background
         val loaderContainer = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.WHITE)
-            setPadding(64, 48, 64, 48) // Increased horizontal and vertical padding
+            setPadding(80, 60, 80, 60) // More generous padding
+            
+            // Create custom rounded background
+            val roundedBackground = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.WHITE)
+                cornerRadius = 24f // Rounded corners
+                // Add subtle shadow effect
+                setStroke(1, Color.parseColor("#E0E0E0"))
+            }
+            background = roundedBackground
             
             // Center in screen with margin from edges
             val params = FrameLayout.LayoutParams(
@@ -89,37 +99,40 @@ class GlobalLoaderManager private constructor() {
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER
-                setMargins(32, 32, 32, 32) // Add margin from screen edges
+                setMargins(48, 48, 48, 48) // Larger margin from screen edges
             }
             layoutParams = params
             
-            // Rounded corners effect
-            background = activity.getDrawable(android.R.drawable.dialog_holo_light_frame)
-            elevation = 8f // Add elevation for better shadow
+            elevation = 12f // Higher elevation for better shadow
         }
         
-        // Progress bar
+        // Progress bar with better styling
         val progressBar = ProgressBar(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = 32 // Increased spacing below progress bar
+                bottomMargin = 40 // More spacing below progress bar
             }
+            // Make progress bar slightly larger
+            scaleX = 1.2f
+            scaleY = 1.2f
         }
         
-        // Loading text
+        // Loading text with better typography
         val loadingText = TextView(activity).apply {
             text = message
-            textSize = 16f
-            setTextColor(Color.parseColor("#333333"))
+            textSize = 17f // Slightly larger text
+            setTextColor(Color.parseColor("#2C2C2C")) // Darker, more readable color
             gravity = Gravity.CENTER
-            setPadding(16, 0, 16, 0) // Add horizontal padding to text
+            setPadding(24, 0, 24, 0) // More horizontal padding
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            // Better font weight
+            setTypeface(typeface, android.graphics.Typeface.NORMAL)
         }
         
         loaderContainer.addView(progressBar)
