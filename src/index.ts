@@ -1,20 +1,26 @@
 import { Identifier, StartPurchasePathOptions } from "./ExpoButtonSdk.types";
 import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 
+// Store the current listener to avoid accumulation
+let currentPromotionListener: any = null;
+
 export async function startPurchasePath(options: StartPurchasePathOptions) {
-  // Set up the event listener if callback is provided
+  // Clean up previous listener if exists
+  if (currentPromotionListener) {
+    currentPromotionListener.remove();
+    currentPromotionListener = null;
+  }
+
+  // Set up new event listener if callback is provided
   if (options.onPromotionClick) {
-    ExpoButtonSdkModule.addListener(
+    currentPromotionListener = ExpoButtonSdkModule.addListener(
       "onPromotionClick",
       async (event: { promotionId: string; closeOnPromotionClick: boolean }) => {
         try {
           const result = await options.onPromotionClick!(event.promotionId);
           
-          // Close current purchase path if the option is enabled (default: true)
-          const shouldClose = event.closeOnPromotionClick ?? options.closeOnPromotionClick ?? true;
-          if (shouldClose) {
-            await closePurchasePath();
-          }
+          // Note: Browser dismiss is handled automatically on native side
+          // based on closeOnPromotionClick setting
           
           // Start new purchase path
           await startPurchasePath({
@@ -27,9 +33,6 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
         }
       }
     );
-
-    // Clean up listener when purchase path closes
-    // Note: This cleanup logic might need adjustment based on Button SDK lifecycle
   }
 
   return await ExpoButtonSdkModule.startPurchasePath(options);

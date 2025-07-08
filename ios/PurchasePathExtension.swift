@@ -48,11 +48,11 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         
         // Initialize promotion manager if promotion data is provided
         if let promotionData = options["promotionData"] as? NSDictionary {
-            self.promotionManager = PromotionManager(promotionData: promotionData, onPromotionClickCallback: { _ in })
+            self.promotionManager = PromotionManager(promotionData: promotionData, onPromotionClickCallback: { _, _ in })
         }
     }
     
-    func setPromotionClickCallback(_ callback: @escaping (String) -> Void) {
+    func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         promotionManager?.setOnPromotionClickCallback(callback)
     }
     

@@ -61,8 +61,14 @@ public class ExpoButtonSdkModule: Module {
             // Store reference for potential cleanup
             self.currentPurchasePathExtension = purchasePathExtension
             
-            // Set up promotion click callback
-            purchasePathExtension.setPromotionClickCallback { [weak self] promotionId in
+            // Set up promotion click callback with immediate browser dismiss
+            purchasePathExtension.setPromotionClickCallback { [weak self] promotionId, browser in
+
+                // Close browser immediately if needed
+                if purchasePathExtension.closeOnPromotionClick {
+                    browser?.dismiss()
+                }
+
                 // Send event to JavaScript
                 self?.sendEvent("onPromotionClick", [
                     "promotionId": promotionId,
@@ -111,9 +117,6 @@ public class ExpoButtonSdkModule: Module {
 #if DEBUG
             print("expo-button-sdk closePurchasePath")
 #endif
-            
-            // Close any current purchase path
-//            Button.purchasePath.dismiss()
         }
 
     }

@@ -5,19 +5,23 @@ import UIKit
 class PromotionManager {
     
     private var promotionData: NSDictionary?
-    private var onPromotionClickCallback: ((String) -> Void)?
+    private var onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?
+    private weak var currentBrowser: BrowserInterface?
     
-    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String) -> Void)?) {
+    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
     }
     
-    func setOnPromotionClickCallback(_ callback: @escaping (String) -> Void) {
+    func setOnPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         self.onPromotionClickCallback = callback
     }
     
     func setupPromotionsBadge(for browser: BrowserInterface) {
         guard let promotionData = self.promotionData else { return }
+        
+        // Store browser reference for dismiss functionality
+        self.currentBrowser = browser
         
         let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
         let featuredPromotion = promotionData["featuredPromotion"] as? NSDictionary
@@ -105,7 +109,7 @@ class PromotionManager {
             let actionTitle = createPromotionActionTitle(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
             let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
                 if let promotionId = featuredPromotion["id"] as? String {
-                    self?.onPromotionClickCallback?(promotionId)
+                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
                 }
             }
             alertController.addAction(action)
@@ -117,7 +121,7 @@ class PromotionManager {
             let actionTitle = createPromotionActionTitle(promotion: promotion, isFeature: false, rewardText: rewardText)
             let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
                 if let promotionId = promotion["id"] as? String {
-                    self?.onPromotionClickCallback?(promotionId)
+                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
                 }
             }
             alertController.addAction(action)
