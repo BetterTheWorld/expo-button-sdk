@@ -18,6 +18,25 @@ import android.widget.RelativeLayout
 import com.usebutton.sdk.purchasepath.BrowserInterface
 
 object ConfirmationDialog {
+    fun showExitConfirmationAlert(
+        context: Context,
+        browser: BrowserInterface,
+        title: String?,
+        message: String?,
+        stayButtonLabel: String?,
+        leaveButtonLabel: String?,
+        callback: (Boolean) -> Unit
+    ) {
+        show(
+            context,
+            title ?: "Are you sure you want to leave?",
+            message ?: "You may lose your progress and any available deals.",
+            stayButtonLabel ?: "Stay",
+            leaveButtonLabel ?: "Leave",
+            browser
+        )
+    }
+    
     fun show(
         context: Context,
         title: String,
