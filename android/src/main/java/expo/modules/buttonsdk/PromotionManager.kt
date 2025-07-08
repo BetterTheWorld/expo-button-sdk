@@ -1,5 +1,6 @@
 package expo.modules.buttonsdk
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.view.Gravity
@@ -454,6 +455,13 @@ class PromotionManager(
                     
                     // Remove the overlay
                     container.removeView(dialogContainer)
+                    
+                    // Show global loader over everything (including WebView)
+                    val activity = context as? Activity
+                    if (activity != null) {
+                        GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
+                        android.util.Log.d("PromotionManager", "🔄 Global loader shown")
+                    }
                     
                     // Call the promotion click callback
                     android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $id")

@@ -68,6 +68,10 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         print("expo-button-sdk browserDidInitialize")
 #endif
         
+        // Hide any global loader when new browser initializes
+        GlobalLoaderManager.shared.hideLoader()
+        print("🔄 Global loader hidden on browser initialization")
+        
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
         browser.header.title.color = self.headerTitleColor

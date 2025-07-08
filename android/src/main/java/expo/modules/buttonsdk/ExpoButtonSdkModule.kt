@@ -109,12 +109,18 @@ class ExpoButtonSdkModule() : Module() {
             browser?.dismiss()
           } else {
             Log.d("CustomPurchasePathExtension", "🔄 Browser stays open (closeOnPromotionClick=false)")
+            // Hide loader since we're not navigating to a new promotion
+            GlobalLoaderManager.getInstance().hideLoader()
           }
         }
       }
     }
 
     override fun onInitialized(browser: BrowserInterface) {
+      // Hide any global loader when new browser initializes
+      GlobalLoaderManager.getInstance().hideLoader()
+      Log.d("CustomPurchasePathExtension", "🔄 Global loader hidden on browser initialization")
+      
       with(browser.header) {
         title.text = options["headerTitle"] as? String ?: ""
         subtitle.text = options["headerSubtitle"] as? String ?: ""

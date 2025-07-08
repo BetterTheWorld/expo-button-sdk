@@ -67,6 +67,10 @@ public class ExpoButtonSdkModule: Module {
                 // Close browser immediately if needed
                 if purchasePathExtension.closeOnPromotionClick {
                     browser?.dismiss()
+                } else {
+                    // Hide loader since we're not navigating to a new promotion
+                    GlobalLoaderManager.shared.hideLoader()
+                    print("🔄 Global loader hidden (closeOnPromotionClick=false)")
                 }
 
                 // Send event to JavaScript

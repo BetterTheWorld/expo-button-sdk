@@ -109,6 +109,10 @@ class PromotionManager {
             let actionTitle = createPromotionActionTitle(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
             let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
                 if let promotionId = featuredPromotion["id"] as? String {
+                    // Show global loader over everything (including WebView)
+                    GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
+                    print("🔄 Global loader shown for featured promotion")
+                    
                     self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
                 }
             }
@@ -121,6 +125,10 @@ class PromotionManager {
             let actionTitle = createPromotionActionTitle(promotion: promotion, isFeature: false, rewardText: rewardText)
             let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
                 if let promotionId = promotion["id"] as? String {
+                    // Show global loader over everything (including WebView)
+                    GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
+                    print("🔄 Global loader shown for promotion")
+                    
                     self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
                 }
             }
