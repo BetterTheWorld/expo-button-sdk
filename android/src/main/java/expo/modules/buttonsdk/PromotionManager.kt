@@ -423,27 +423,27 @@ class PromotionManager(
         }
         dialogContent.addView(titleView)
         
-        // Scrollable promotion list
+        // Scrollable promotion list with improved styling
+        val maxHeight = (context.resources.displayMetrics.heightPixels * 0.4).toInt() // 40% of screen height
         val scrollView = android.widget.ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                weight = 1f
-            }
+                maxHeight
+            )
+            isScrollbarFadingEnabled = false // Always show scrollbar for better UX
         }
         
         val promotionListContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
         }
         
-        // Add promotion items
-        promotions.forEach { (title, id) ->
+        // Add promotion items with dividers
+        promotions.forEachIndexed { index, (title, id) ->
             val promotionButton = TextView(context).apply {
                 text = title
                 textSize = 14f
                 setTextColor(Color.BLACK)
-                setPadding(20, 15, 20, 15)
+                setPadding(20, 18, 20, 18) // Slightly more padding for better touch target
                 gravity = Gravity.START
                 setBackgroundResource(android.R.drawable.list_selector_background)
                 isClickable = true
@@ -460,17 +460,22 @@ class PromotionManager(
                     onPromotionClickCallback?.invoke(id, currentBrowser)
                     android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
                 }
-                
-                // Add divider
-                val params = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = 2
-                }
-                layoutParams = params
             }
             promotionListContainer.addView(promotionButton)
+            
+            // Add divider between items (except after the last item)
+            if (index < promotions.size - 1) {
+                val divider = View(context).apply {
+                    setBackgroundColor(Color.parseColor("#E0E0E0")) // Light gray divider
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        1 // 1dp height
+                    ).apply {
+                        setMargins(20, 0, 20, 0) // Indent divider to match content padding
+                    }
+                }
+                promotionListContainer.addView(divider)
+            }
         }
         
         scrollView.addView(promotionListContainer)
