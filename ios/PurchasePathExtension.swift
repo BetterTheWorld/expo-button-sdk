@@ -17,6 +17,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var exitConfirmationMessage: String?
     var stayButtonLabel: String?
     var leaveButtonLabel: String?
+    // Promotion manager
+    private var promotionManager: PromotionManager?
+    var closeOnPromotionClick: Bool = true
     
     init(options: NSDictionary) {
         super.init()
@@ -39,6 +42,24 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
             self.stayButtonLabel = exitConfirmationConfig["stayButtonLabel"] as? String
             self.leaveButtonLabel = exitConfirmationConfig["leaveButtonLabel"] as? String
         }
+        
+        // Parse closeOnPromotionClick option (default: true)
+        self.closeOnPromotionClick = options["closeOnPromotionClick"] as? Bool ?? true
+        
+        // Initialize promotion manager if promotion data is provided
+        if let promotionData = options["promotionData"] as? NSDictionary {
+            self.promotionManager = PromotionManager(promotionData: promotionData, onPromotionClickCallback: { _ in })
+        }
+    }
+    
+    func setPromotionClickCallback(_ callback: @escaping (String) -> Void) {
+        promotionManager?.setOnPromotionClickCallback(callback)
+    }
+    
+    func closeBrowserIfNeeded(_ browser: BrowserInterface) {
+        if closeOnPromotionClick {
+            browser.dismiss()
+        }
     }
 
     
@@ -55,6 +76,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.header.tintColor = self.headerTintColor
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
+        
+        // Setup promotions badge if available
+        promotionManager?.setupPromotionsBadge(for: browser)
     }
     
     func browserDidClose() {
@@ -84,7 +108,6 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         }
         return true
     }
-    
     
     // Utility to convert hex string to UIColor
     func colorFromHex(_ hex: String) -> UIColor? {

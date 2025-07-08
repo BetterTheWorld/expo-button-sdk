@@ -6,6 +6,21 @@ export interface ExitConfirmationConfig {
   leaveButtonLabel?: string;
 }
 
+export interface Promotion {
+  id: string;
+  title: string;
+  subtitle?: string;
+  code?: string;
+  createdAt: string;
+}
+
+export interface PromotionData {
+  merchantName: string;
+  rewardText?: string;
+  featuredPromotion?: Promotion;
+  promotions: Promotion[];
+}
+
 export interface StartPurchasePathOptions {
   url: string;
   token: string;
@@ -18,6 +33,9 @@ export interface StartPurchasePathOptions {
   footerBackgroundColor?: string;
   footerTintColor?: string;
   exitConfirmation?: ExitConfirmationConfig;
+  promotionData?: PromotionData;
+  onPromotionClick?: (promotionId: string) => Promise<{ url: string; token: string }>;
+  closeOnPromotionClick?: boolean; // Default: true - whether to close current instance when promotion is clicked
 }
 
 export type Identifier = string;

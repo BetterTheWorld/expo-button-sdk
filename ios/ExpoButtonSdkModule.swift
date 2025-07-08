@@ -2,12 +2,16 @@ import ExpoModulesCore
 import Button
 
 public class ExpoButtonSdkModule: Module {
+    private var currentPurchasePathExtension: PurchasePathExtensionCustom?
+    
     public static func requiresMainQueueSetup() -> Bool {
             return true
         }
     
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
+        
+        Events("onPromotionClick")
         AsyncFunction("initializeSDK") { (promise: Promise) in
             if ButtonSDKDelegate.isConfigured {
                 promise.resolve(true)
@@ -53,6 +57,19 @@ public class ExpoButtonSdkModule: Module {
 #endif
 
             let purchasePathExtension = PurchasePathExtensionCustom(options: options)
+            
+            // Store reference for potential cleanup
+            self.currentPurchasePathExtension = purchasePathExtension
+            
+            // Set up promotion click callback
+            purchasePathExtension.setPromotionClickCallback { [weak self] promotionId in
+                // Send event to JavaScript
+                self?.sendEvent("onPromotionClick", [
+                    "promotionId": promotionId,
+                    "closeOnPromotionClick": purchasePathExtension.closeOnPromotionClick
+                ])
+            }
+            
             Button.purchasePath.extension = purchasePathExtension
             let request = PurchasePathRequest(url: url)
             
@@ -88,6 +105,15 @@ public class ExpoButtonSdkModule: Module {
 #endif
             
             Button.user.setIdentifier(identifier)
+        }
+        
+        Function("closePurchasePath") {
+#if DEBUG
+            print("expo-button-sdk closePurchasePath")
+#endif
+            
+            // Close any current purchase path
+//            Button.purchasePath.dismiss()
         }
 
     }
