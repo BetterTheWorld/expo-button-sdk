@@ -106,8 +106,21 @@ class PromotionManager {
             GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
             print("🔄 Global loader shown for promotion")
             
-            // Execute callback immediately
-            self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+            // FORCE close current browser first, then execute callback
+            if let browser = self?.currentBrowser {
+                print("🔄 Forcing browser close before promotion")
+                browser.dismiss(animated: false) // Force immediate close
+                
+                // Wait for browser to fully close, then execute callback
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("🔄 Executing promotion callback after forced browser close")
+                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                }
+            } else {
+                // No current browser, execute immediately
+                print("🔄 No current browser - executing promotion callback immediately")
+                self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+            }
         }
         
         if let viewController = getTopMostViewController() {
