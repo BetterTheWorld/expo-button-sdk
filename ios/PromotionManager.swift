@@ -113,7 +113,14 @@ class PromotionManager {
                     GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
                     print("🔄 Global loader shown for featured promotion")
                     
+                    // Execute callback immediately - the action sheet will dismiss naturally
                     self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                    
+                    // Safety timeout to hide loader in case something goes wrong
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                        GlobalLoaderManager.shared.hideLoader()
+                        print("🔄 Global loader hidden by safety timeout")
+                    }
                 }
             }
             alertController.addAction(action)
@@ -129,7 +136,14 @@ class PromotionManager {
                     GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
                     print("🔄 Global loader shown for promotion")
                     
+                    // Execute callback immediately - the action sheet will dismiss naturally
                     self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                    
+                    // Safety timeout to hide loader in case something goes wrong
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                        GlobalLoaderManager.shared.hideLoader()
+                        print("🔄 Global loader hidden by safety timeout")
+                    }
                 }
             }
             alertController.addAction(action)
