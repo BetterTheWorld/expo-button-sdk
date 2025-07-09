@@ -68,9 +68,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         print("expo-button-sdk browserDidInitialize")
 #endif
         
-        // Hide any global loader when new browser initializes
-        GlobalLoaderManager.shared.hideLoader()
-        print("🔄 Global loader hidden on browser initialization")
+        // Don't hide loader here - wait for URL to load completely
         
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
@@ -85,10 +83,46 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         promotionManager?.setupPromotionsBadge(for: browser)
     }
     
+    func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
+#if DEBUG
+        print("expo-button-sdk didNavigateTo - URL loaded, will hide loader with 2s delay")
+#endif
+        // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            GlobalLoaderManager.shared.hideLoader()
+            print("🔄 Global loader hidden on page navigation complete (2s delay)")
+        }
+    }
+    
+    func browser(_ browser: BrowserInterface, didNavigateToProduct page: ProductPage) {
+#if DEBUG
+        print("expo-button-sdk didNavigateToProduct - URL loaded, will hide loader with 2s delay")
+#endif
+        // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            GlobalLoaderManager.shared.hideLoader()
+            print("🔄 Global loader hidden on product page navigation complete (2s delay)")
+        }
+    }
+    
+    func browser(_ browser: BrowserInterface, didNavigateToPurchase page: PurchasePage) {
+#if DEBUG
+        print("expo-button-sdk didNavigateToPurchase - URL loaded, will hide loader with 2s delay")
+#endif
+        // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            GlobalLoaderManager.shared.hideLoader()
+            print("🔄 Global loader hidden on purchase page navigation complete (2s delay)")
+        }
+    }
+    
     func browserDidClose() {
 #if DEBUG
         print("expo-button-sdk browserDidClose")
 #endif
+        // Don't hide loader here - it might be closing the old browser before opening new one
+        // Let the navigation methods handle loader visibility
+        print("🔄 Browser closed - loader management delegated to navigation methods")
     }
     
     func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {

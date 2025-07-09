@@ -99,57 +99,26 @@ class PromotionManager {
     private func showPromotionsList() {
         guard let promotionData = self.promotionData else { return }
         
-        let alertController = UIAlertController(title: "Promotions", message: nil, preferredStyle: .actionSheet)
-        
-        let merchantName = promotionData["merchantName"] as? String ?? "Store"
-        let rewardText = promotionData["rewardText"] as? String
-        
-        // Add featured promotion if available
-        if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any] {
-            let actionTitle = createPromotionActionTitle(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
-            let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
-                if let promotionId = featuredPromotion["id"] as? String {
-                    // Show global loader over everything (including WebView)
-                    GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
-                    print("🔄 Global loader shown for featured promotion")
-                    
-                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
-                }
-            }
-            alertController.addAction(action)
+        let promotionsVC = PromotionListViewController()
+        promotionsVC.promotionData = promotionData
+        promotionsVC.onPromotionSelected = { [weak self] promotionId in
+            // Show loader immediately when promotion is tapped
+            GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
+            print("🔄 Global loader shown for promotion")
+            
+            // Execute callback immediately
+            self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
         }
         
-        // Add regular promotions
-        let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
-        for promotion in promotions {
-            let actionTitle = createPromotionActionTitle(promotion: promotion, isFeature: false, rewardText: rewardText)
-            let action = UIAlertAction(title: actionTitle, style: .default) { [weak self] _ in
-                if let promotionId = promotion["id"] as? String {
-                    // Show global loader over everything (including WebView)
-                    GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
-                    print("🔄 Global loader shown for promotion")
-                    
-                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
-                }
-            }
-            alertController.addAction(action)
-        }
-        
-        alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        // Present from the top-most view controller to ensure it's above the webview
         if let viewController = getTopMostViewController() {
-            // For iPad support
-            if let popover = alertController.popoverPresentationController {
-                popover.sourceView = viewController.view
-                popover.sourceRect = CGRect(x: viewController.view.bounds.midX, y: 100, width: 0, height: 0)
-                popover.permittedArrowDirections = .up
+            promotionsVC.modalPresentationStyle = .pageSheet
+            if #available(iOS 15.0, *) {
+                if let sheet = promotionsVC.sheetPresentationController {
+                    sheet.detents = [.medium(), .large()]
+                    sheet.prefersGrabberVisible = true
+                }
             }
-            
-            // Set maximum window level to appear above everything
-            alertController.view.layer.zPosition = CGFloat.greatestFiniteMagnitude
-            
-            viewController.present(alertController, animated: true)
+            viewController.present(promotionsVC, animated: true)
         }
     }
     
@@ -238,5 +207,180 @@ class PromotionManager {
         }
         
         return topViewController
+    }
+}
+
+// Simple custom view controller for promotions list
+class PromotionListViewController: UIViewController {
+    
+    var promotionData: NSDictionary?
+    var onPromotionSelected: ((String) -> Void)?
+    
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
+    private let stackView = UIStackView()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        setupUI()
+        setupPromotions()
+    }
+    
+    private func setupUI() {
+        view.backgroundColor = UIColor.systemBackground
+        
+        // Add title
+        let titleLabel = UILabel()
+        titleLabel.text = "Promotions"
+        titleLabel.font = UIFont.boldSystemFont(ofSize: 18)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Setup scroll view
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Setup stack view
+        stackView.axis = .vertical
+        stackView.spacing = 0
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Add views
+        view.addSubview(titleLabel)
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
+        contentView.addSubview(stackView)
+        
+        // Setup constraints
+        NSLayoutConstraint.activate([
+            // Title
+            titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            
+            // Scroll view
+            scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            
+            // Content view
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            // Stack view
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+    }
+    
+    private func setupPromotions() {
+        guard let promotionData = self.promotionData else { return }
+        
+        let rewardText = promotionData["rewardText"] as? String
+        
+        // Add featured promotion if available
+        if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any] {
+            let promotionView = createPromotionView(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
+            stackView.addArrangedSubview(promotionView)
+        }
+        
+        // Add regular promotions
+        let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
+        for promotion in promotions {
+            let promotionView = createPromotionView(promotion: promotion, isFeature: false, rewardText: rewardText)
+            stackView.addArrangedSubview(promotionView)
+        }
+    }
+    
+    private func createPromotionView(promotion: [String: Any], isFeature: Bool, rewardText: String?) -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = UIColor.systemBackground
+        
+        // Add border
+        containerView.layer.borderWidth = 1
+        containerView.layer.borderColor = UIColor.systemGray4.cgColor
+        
+        let button = UIButton(type: .system)
+        button.contentHorizontalAlignment = .left
+        button.contentVerticalAlignment = .top
+        button.contentEdgeInsets = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Create title
+        var title = promotion["title"] as? String ?? "Promotion"
+        
+        // Add NEW badge if promotion is new
+        if let createdAt = promotion["createdAt"] as? String, isPromotionNew(createdAt) {
+            title = "🆕 \(title)"
+        }
+        
+        // Add feature indicator
+        if isFeature {
+            title = "⭐ \(title)"
+        }
+        
+        // Create attributed string for multiple lines
+        let attributedTitle = NSMutableAttributedString(string: title, attributes: [
+            .font: UIFont.systemFont(ofSize: 16, weight: .medium),
+            .foregroundColor: UIColor.label
+        ])
+        
+        // Add reward text if available
+        if let reward = rewardText, !reward.isEmpty {
+            attributedTitle.append(NSAttributedString(string: "\n\(reward)", attributes: [
+                .font: UIFont.systemFont(ofSize: 14),
+                .foregroundColor: UIColor.systemBlue
+            ]))
+        }
+        
+        // Add coupon code if available
+        if let code = promotion["code"] as? String, !code.isEmpty {
+            attributedTitle.append(NSAttributedString(string: "\nCode: \(code)", attributes: [
+                .font: UIFont.systemFont(ofSize: 14),
+                .foregroundColor: UIColor.systemGray
+            ]))
+        }
+        
+        button.setAttributedTitle(attributedTitle, for: .normal)
+        button.titleLabel?.numberOfLines = 0
+        button.titleLabel?.lineBreakMode = .byWordWrapping
+        
+        // Add tap action
+        if let promotionId = promotion["id"] as? String {
+            button.addAction(UIAction { [weak self] _ in
+                self?.dismiss(animated: true) {
+                    self?.onPromotionSelected?(promotionId)
+                }
+            }, for: .touchUpInside)
+        }
+        
+        containerView.addSubview(button)
+        
+        NSLayoutConstraint.activate([
+            button.topAnchor.constraint(equalTo: containerView.topAnchor),
+            button.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            button.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 60)
+        ])
+        
+        return containerView
+    }
+    
+    private func isPromotionNew(_ createdAt: String) -> Bool {
+        let formatter = ISO8601DateFormatter()
+        guard let createdDate = formatter.date(from: createdAt) else {
+            return false
+        }
+        
+        let twoDaysAgo = Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
+        return createdDate >= twoDaysAgo
     }
 }
