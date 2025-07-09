@@ -106,7 +106,7 @@ export function Example() {
                 await new Promise((resolve) => setTimeout(resolve, 1000));
 
                 return {
-                  url: `https://example.com/promotion/${promotionId}`,
+                  url: `https://example.com`,
                   token: "new-token-for-promotion",
                 };
               },
