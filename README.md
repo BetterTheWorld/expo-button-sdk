@@ -82,7 +82,9 @@ startPurchasePath({
   headerBackgroundColor: "#FFFFFF",
   headerTintColor:       "#FFFFFF",
   footerBackgroundColor: "#FFFFFF",
-  footerTintColor:       "#FFFFFF"
+  footerTintColor:       "#FFFFFF",
+  promotionBadgeLabel:   "Deals", // optional: customize promotion badge label
+  promotionListTitle:    "Available Deals" // optional: customize promotion list title
 });
 
 // On user login
@@ -144,6 +146,8 @@ startPurchasePath({
   token: "my-tracking-token",
   promotionData: promotionData,
   closeOnPromotionClick: true, // Default: true - closes current instance when promotion is clicked
+  promotionBadgeLabel: "Deals", // Customize badge label (default: "Offers")
+  promotionListTitle: "Available Deals", // Customize list title (default: "Promotions" for iOS, "Available Promotions" for Android)
   onPromotionClick: async (promotionId: string) => {
     console.log('Promotion clicked:', promotionId);
     
@@ -166,6 +170,31 @@ startPurchasePath({
 - **🆕 New Badge**: Shows "NEW!" for promotions created in last 2 days
 - **ActionSheet**: Native iOS list for promotion selection
 - **Auto-close**: Configurable closing of current instance when selecting new promotion
+
+### Promotion Customization
+
+You can customize the text labels used in the promotion UI:
+
+```typescript
+startPurchasePath({
+  url: "https://the.button.url",
+  token: "my-tracking-token",
+  promotionData: promotionData,
+  
+  // Customize the badge label (appears in header)
+  promotionBadgeLabel: "Ofert@", // Default: "Offers"
+  
+  // Customize the list title (appears in promotion modal)
+  promotionListTitle: "Promos!", // Default: "Promotions" (iOS) or "Available Promotions" (Android)
+  
+  onPromotionClick: async (promotionId: string) => {
+    // Handle promotion selection
+    return { url: newUrl, token: newToken };
+  }
+});
+```
+
+**Supported Languages**: These labels can be customized for any language or branding needs.
 
 # Contributing
 
