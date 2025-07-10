@@ -81,6 +81,10 @@ class ExpoButtonSdkModule() : Module() {
     private val leaveButtonLabel: String
     private val closeOnPromotionClick: Boolean
     
+    // Promotion labels
+    private val promotionBadgeLabel: String
+    private val promotionListTitle: String
+    
     // Promotion manager
     private var promotionManager: PromotionManager? = null
     
@@ -96,10 +100,14 @@ class ExpoButtonSdkModule() : Module() {
       // Parse closeOnPromotionClick option (default: true)
       closeOnPromotionClick = options["closeOnPromotionClick"] as? Boolean ?: true
       
+      // Parse promotion label options
+      promotionBadgeLabel = options["promotionBadgeLabel"] as? String ?: "Offers"
+      promotionListTitle = options["promotionListTitle"] as? String ?: "Available Promotions"
+      
       // Initialize promotion manager if promotion data is provided
       val promotionData = options["promotionData"] as? Map<String, Any>
       if (promotionData != null) {
-        promotionManager = PromotionManager(activity, promotionData) { promotionId, browser ->
+        promotionManager = PromotionManager(activity, promotionData, { promotionId, browser ->
           Log.d("CustomPurchasePathExtension", "🎯 Received promotion click: $promotionId")
           onPromotionClick(promotionId)
           Log.d("CustomPurchasePathExtension", "📤 Sent promotion event to TypeScript")
@@ -112,7 +120,7 @@ class ExpoButtonSdkModule() : Module() {
             // Hide loader since we're not navigating to a new promotion
             GlobalLoaderManager.getInstance().hideLoader()
           }
-        }
+        }, promotionBadgeLabel, promotionListTitle)
       }
     }
 

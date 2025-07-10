@@ -20,6 +20,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     // Promotion manager
     private var promotionManager: PromotionManager?
     var closeOnPromotionClick: Bool = true
+    // Promotion labels
+    var promotionBadgeLabel: String?
+    var promotionListTitle: String?
     
     init(options: NSDictionary) {
         super.init()
@@ -46,9 +49,18 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         // Parse closeOnPromotionClick option (default: true)
         self.closeOnPromotionClick = options["closeOnPromotionClick"] as? Bool ?? true
         
+        // Parse promotion label options
+        self.promotionBadgeLabel = options["promotionBadgeLabel"] as? String
+        self.promotionListTitle = options["promotionListTitle"] as? String
+        
         // Initialize promotion manager if promotion data is provided
         if let promotionData = options["promotionData"] as? NSDictionary {
-            self.promotionManager = PromotionManager(promotionData: promotionData, onPromotionClickCallback: { _, _ in })
+            self.promotionManager = PromotionManager(
+                promotionData: promotionData, 
+                onPromotionClickCallback: { _, _ in },
+                badgeLabel: self.promotionBadgeLabel,
+                listTitle: self.promotionListTitle
+            )
         }
     }
     

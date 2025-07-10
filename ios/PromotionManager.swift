@@ -7,10 +7,14 @@ class PromotionManager {
     private var promotionData: NSDictionary?
     private var onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?
     private weak var currentBrowser: BrowserInterface?
+    private var badgeLabel: String
+    private var listTitle: String
     
-    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?) {
+    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
+        self.badgeLabel = badgeLabel ?? "Offers"
+        self.listTitle = listTitle ?? "Promotions"
     }
     
     func setOnPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
@@ -60,7 +64,7 @@ class PromotionManager {
         iconLabel.translatesAutoresizingMaskIntoConstraints = false
         
         let titleLabel = UILabel()
-        titleLabel.text = "Offers"
+        titleLabel.text = self.badgeLabel
         titleLabel.font = UIFont.systemFont(ofSize: 14)
         titleLabel.textColor = UIColor.white
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -101,6 +105,7 @@ class PromotionManager {
         
         let promotionsVC = PromotionListViewController()
         promotionsVC.promotionData = promotionData
+        promotionsVC.listTitle = self.listTitle
         promotionsVC.onPromotionSelected = { [weak self] promotionId in
             // Show loader immediately when promotion is tapped
             GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
@@ -228,6 +233,7 @@ class PromotionListViewController: UIViewController {
     
     var promotionData: NSDictionary?
     var onPromotionSelected: ((String) -> Void)?
+    var listTitle: String = "Promotions"
     
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -245,7 +251,7 @@ class PromotionListViewController: UIViewController {
         
         // Add title
         let titleLabel = UILabel()
-        titleLabel.text = "Promotions"
+        titleLabel.text = listTitle
         titleLabel.font = UIFont.boldSystemFont(ofSize: 18)
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
