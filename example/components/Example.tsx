@@ -95,6 +95,8 @@ export function Example() {
               footerBackgroundColor: "#074A7B",
               headerSubtitle: "Gives 10%",
               headerTitle: "Gapo",
+              promotionBadgeLabel: "Deals!",
+              promotionListTitle: "De@ls!",
               url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
               token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
               promotionData: MOCK_PROMOTION_DATA,

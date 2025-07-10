@@ -36,6 +36,8 @@ export interface StartPurchasePathOptions {
   promotionData?: PromotionData;
   onPromotionClick?: (promotionId: string) => Promise<{ url: string; token: string }>;
   closeOnPromotionClick?: boolean; // Default: true - whether to close current instance when promotion is clicked
+  promotionBadgeLabel?: string; // Label for the promotion badge (e.g., "Offers", "Deals")
+  promotionListTitle?: string; // Title for the promotion list modal (e.g., "Promotions", "Available Offers")
 }
 
 export type Identifier = string;

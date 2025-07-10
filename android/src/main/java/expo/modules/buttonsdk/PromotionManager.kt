@@ -19,7 +19,9 @@ import java.util.*
 class PromotionManager(
     private val context: Context,
     private val promotionData: Map<String, Any>?,
-    private var onPromotionClickCallback: ((String, BrowserInterface?) -> Unit)?
+    private var onPromotionClickCallback: ((String, BrowserInterface?) -> Unit)?,
+    private val badgeLabel: String = "Offers",
+    private val listTitle: String = "Available Promotions"
 ) {
     
     private var currentBrowser: BrowserInterface? = null
@@ -79,9 +81,9 @@ class PromotionManager(
         try {
             val originalTitle = currentBrowser?.header?.title?.text
             val newTitle = if (originalTitle.isNullOrEmpty()) {
-                "🏷️ Offers ($totalCount) - Tap here"
+                "🏷️ $badgeLabel ($totalCount) - Tap here"
             } else {
-                "$originalTitle | 🏷️ Offers ($totalCount)"
+                "$originalTitle | 🏷️ $badgeLabel ($totalCount)"
             }
             currentBrowser?.header?.title?.text = newTitle
             
@@ -147,7 +149,7 @@ class PromotionManager(
         
         // Text
         val textView = TextView(context).apply {
-            text = "Offers"
+            text = badgeLabel
             textSize = 14f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -438,7 +440,7 @@ class PromotionManager(
         
         // Title
         val titleView = TextView(context).apply {
-            text = "Available Promotions"
+            text = listTitle
             textSize = 18f
             setTextColor(Color.BLACK)
             gravity = Gravity.CENTER
