@@ -109,7 +109,7 @@ class PromotionManager {
             // FORCE close current browser first, then execute callback
             if let browser = self?.currentBrowser {
                 print("🔄 Forcing browser close before promotion")
-                browser.dismiss(animated: false) // Force immediate close
+                browser.dismiss() // Force immediate close
                 
                 // Wait for browser to fully close, then execute callback
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -256,7 +256,7 @@ class PromotionListViewController: UIViewController {
         
         // Setup stack view
         stackView.axis = .vertical
-        stackView.spacing = 0
+        stackView.spacing = 12
         stackView.translatesAutoresizingMaskIntoConstraints = false
         
         // Add views
@@ -286,10 +286,10 @@ class PromotionListViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
             // Stack view
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
         ])
     }
     
@@ -316,14 +316,15 @@ class PromotionListViewController: UIViewController {
         let containerView = UIView()
         containerView.backgroundColor = UIColor.systemBackground
         
-        // Add border
-        containerView.layer.borderWidth = 1
-        containerView.layer.borderColor = UIColor.systemGray4.cgColor
+        // Add bottom border using a separator view
+        let separatorView = UIView()
+        separatorView.backgroundColor = UIColor.systemGray4
+        separatorView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(separatorView)
         
         let button = UIButton(type: .system)
         button.contentHorizontalAlignment = .left
         button.contentVerticalAlignment = .top
-        button.contentEdgeInsets = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         button.translatesAutoresizingMaskIntoConstraints = false
         
         // Create title
@@ -339,17 +340,23 @@ class PromotionListViewController: UIViewController {
             title = "⭐ \(title)"
         }
         
-        // Create attributed string for multiple lines
+        // Create attributed string for multiple lines with better spacing
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 6 // Add spacing between lines
+        paragraphStyle.paragraphSpacing = 12 // Add spacing between paragraphs
+        
         let attributedTitle = NSMutableAttributedString(string: title, attributes: [
             .font: UIFont.systemFont(ofSize: 16, weight: .medium),
-            .foregroundColor: UIColor.label
+            .foregroundColor: UIColor.label,
+            .paragraphStyle: paragraphStyle
         ])
         
         // Add reward text if available
         if let reward = rewardText, !reward.isEmpty {
             attributedTitle.append(NSAttributedString(string: "\n\(reward)", attributes: [
                 .font: UIFont.systemFont(ofSize: 14),
-                .foregroundColor: UIColor.systemBlue
+                .foregroundColor: UIColor.systemBlue,
+                .paragraphStyle: paragraphStyle
             ]))
         }
         
@@ -357,13 +364,18 @@ class PromotionListViewController: UIViewController {
         if let code = promotion["code"] as? String, !code.isEmpty {
             attributedTitle.append(NSAttributedString(string: "\nCode: \(code)", attributes: [
                 .font: UIFont.systemFont(ofSize: 14),
-                .foregroundColor: UIColor.systemGray
+                .foregroundColor: UIColor.systemGray,
+                .paragraphStyle: paragraphStyle
             ]))
         }
         
         button.setAttributedTitle(attributedTitle, for: .normal)
         button.titleLabel?.numberOfLines = 0
         button.titleLabel?.lineBreakMode = .byWordWrapping
+        
+        // Ensure button can grow unlimited based on content
+        button.setContentCompressionResistancePriority(.required, for: .vertical)
+        button.setContentHuggingPriority(.defaultLow, for: .vertical)
         
         // Add tap action
         if let promotionId = promotion["id"] as? String {
@@ -377,11 +389,17 @@ class PromotionListViewController: UIViewController {
         containerView.addSubview(button)
         
         NSLayoutConstraint.activate([
-            button.topAnchor.constraint(equalTo: containerView.topAnchor),
-            button.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            button.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            button.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 60)
+            // Button constraints
+            button.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
+            button.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            button.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            button.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -28),
+            
+            // Separator constraints
+            separatorView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            separatorView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            separatorView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            separatorView.heightAnchor.constraint(equalToConstant: 1)
         ])
         
         return containerView
