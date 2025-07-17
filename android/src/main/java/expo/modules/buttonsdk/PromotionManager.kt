@@ -21,6 +21,10 @@ import com.usebutton.sdk.purchasepath.BrowserInterface
 import com.usebutton.sdk.purchasepath.BrowserChromeClient
 import java.text.SimpleDateFormat
 import java.util.*
+import android.app.Dialog
+import android.view.animation.Animation
+import android.view.animation.TranslateAnimation
+import android.widget.ScrollView
 
 class PromotionManager(
     private val context: Context,
@@ -474,78 +478,126 @@ class PromotionManager(
             }
         }
         
-        // Use the browser's view container to show promotions overlay (like ConfirmationDialog)
-        showPromotionsOverlay(promotionItems)
+        // Use Bottom Sheet instead of overlay for better UX
+        showPromotionsBottomSheet(promotionItems)
     }
     
-    private fun showPromotionsOverlay(promotions: List<Pair<String, String>>) {
+    private fun showPromotionsBottomSheet(promotions: List<Pair<String, String>>) {
         val browser = currentBrowser ?: return
-        val viewContainer = browser.viewContainer ?: return
+        val container = browser.viewContainer
+        
+        if (container == null) {
+            android.util.Log.e("PromotionManager", "Could not get view container from browser")
+            return
+        }
         
         try {
-            val dialogView = createPromotionsDialogView(promotions, viewContainer)
-            viewContainer.addView(dialogView)
-            android.util.Log.d("PromotionManager", "✅ Promotions overlay added to browser container")
+            val bottomSheetView = createBottomSheetContent(promotions, container)
+            
+            // Add to browser container (same as ConfirmationDialog)
+            container.addView(bottomSheetView)
+            
+            // Animate the bottom sheet sliding up from bottom
+            val sheetChild = (bottomSheetView as RelativeLayout).getChildAt(0)
+            
+            // Set initial position off-screen at the bottom
+            sheetChild?.translationY = container.height.toFloat()
+            
+            // Animate sliding up
+            sheetChild?.animate()
+                ?.translationY(0f)
+                ?.setDuration(300)
+                ?.setInterpolator(android.view.animation.DecelerateInterpolator())
+                ?.start()
+            
+            android.util.Log.d("PromotionManager", "Bottom sheet overlay added successfully with animation")
+            
         } catch (e: Exception) {
-            android.util.Log.e("PromotionManager", "❌ Error creating promotions overlay", e)
+            android.util.Log.e("PromotionManager", "Error creating bottom sheet overlay", e)
         }
     }
     
-    private fun createPromotionsDialogView(promotions: List<Pair<String, String>>, container: ViewGroup): View {
-        // Create semi-transparent background overlay
-        val dialogContainer = RelativeLayout(context).apply {
+    private fun createBottomSheetContent(promotions: List<Pair<String, String>>, container: ViewGroup): View {
+        val rootView = RelativeLayout(context).apply {
             layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT,
                 RelativeLayout.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(Color.parseColor("#80000000")) // Semi-transparent black
+            setBackgroundColor(Color.parseColor("#80000000")) // Semi-transparent background
         }
         
-        // Create dialog content
-        val dialogContent = LinearLayout(context).apply {
+        // Bottom sheet container
+        val sheetContainer = LinearLayout(context).apply {
+            id = View.generateViewId()
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.WHITE)
-            setPadding(40, 30, 40, 30)
+            setPadding(24, 16, 24, 24)
+            
+            // Rounded corners
+            val cornerRadius = 16f * context.resources.displayMetrics.density
+            val drawable = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadii = floatArrayOf(cornerRadius, cornerRadius, cornerRadius, cornerRadius, 0f, 0f, 0f, 0f)
+            }
+            background = drawable
+            
             layoutParams = RelativeLayout.LayoutParams(
-                (context.resources.displayMetrics.widthPixels * 0.85).toInt(), // 85% of screen width
+                RelativeLayout.LayoutParams.MATCH_PARENT,
                 RelativeLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                addRule(RelativeLayout.CENTER_IN_PARENT)
+                addRule(RelativeLayout.ALIGN_PARENT_BOTTOM)
+                topMargin = (context.resources.displayMetrics.heightPixels * 0.3).toInt()
             }
         }
+        
+        // Handle bar
+        val handleBar = View(context).apply {
+            setBackgroundColor(Color.parseColor("#C0C0C0"))
+            val drawable = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#C0C0C0"))
+                cornerRadius = 2f * context.resources.displayMetrics.density
+            }
+            background = drawable
+            layoutParams = LinearLayout.LayoutParams(
+                (40 * context.resources.displayMetrics.density).toInt(),
+                (4 * context.resources.displayMetrics.density).toInt()
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                bottomMargin = 16
+            }
+        }
+        sheetContainer.addView(handleBar)
         
         // Title
         val titleView = TextView(context).apply {
             text = listTitle
-            textSize = 18f
+            textSize = 20f
             setTextColor(Color.BLACK)
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            setPadding(0, 8, 0, 24)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
-        dialogContent.addView(titleView)
+        sheetContainer.addView(titleView)
         
-        // Scrollable promotion list with improved styling
-        val maxHeight = (context.resources.displayMetrics.heightPixels * 0.4).toInt() // 40% of screen height
-        val scrollView = android.widget.ScrollView(context).apply {
+        // Scrollable promotions list
+        val scrollView = ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                maxHeight
-            )
-            isScrollbarFadingEnabled = false // Always show scrollbar for better UX
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                weight = 1f
+            }
         }
         
         val promotionListContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
         }
         
-        // Add promotion items with dividers
+        // Add promotion items
         promotions.forEachIndexed { index, (title, id) ->
-            val promotionButton = TextView(context).apply {
-                text = title
-                textSize = 14f
-                setTextColor(Color.BLACK)
-                setPadding(20, 18, 20, 18) // Slightly more padding for better touch target
-                gravity = Gravity.START
+            val promotionItem = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 16, 0, 16)
                 setBackgroundResource(android.R.drawable.list_selector_background)
                 isClickable = true
                 isFocusable = true
@@ -553,45 +605,58 @@ class PromotionManager(
                 setOnClickListener {
                     android.util.Log.d("PromotionManager", "🎯 Promotion selected: $id")
                     
-                    // Remove the overlay
-                    container.removeView(dialogContainer)
-                    
-                    // Show global loader over everything (including WebView)
-                    val activity = context as? Activity
-                    if (activity != null) {
-                        GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
-                        android.util.Log.d("PromotionManager", "🔄 Global loader shown")
+                    // Animate closing
+                    animateBottomSheetClose(sheetContainer) {
+                        container.removeView(rootView)
+                        
+                        // Show global loader
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
+                            android.util.Log.d("PromotionManager", "🔄 Global loader shown")
+                        }
+                        
+                        // Call the promotion click callback
+                        android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $id")
+                        onPromotionClickCallback?.invoke(id, currentBrowser)
+                        android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
                     }
-                    
-                    // Call the promotion click callback
-                    android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $id")
-                    onPromotionClickCallback?.invoke(id, currentBrowser)
-                    android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
                 }
             }
-            promotionListContainer.addView(promotionButton)
             
-            // Add divider between items (except after the last item)
+            val titleView = TextView(context).apply {
+                text = title
+                textSize = 16f
+                setTextColor(Color.BLACK)
+                setPadding(16, 0, 16, 0)
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                minHeight = (48 * context.resources.displayMetrics.density).toInt()
+            }
+            promotionItem.addView(titleView)
+            
+            // Add divider (except for last item)
             if (index < promotions.size - 1) {
                 val divider = View(context).apply {
-                    setBackgroundColor(Color.parseColor("#E0E0E0")) // Light gray divider
+                    setBackgroundColor(Color.parseColor("#E0E0E0"))
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        1 // 1dp height
+                        1
                     ).apply {
-                        setMargins(20, 0, 20, 0) // Indent divider to match content padding
+                        setMargins(16, 16, 16, 0)
                     }
                 }
-                promotionListContainer.addView(divider)
+                promotionItem.addView(divider)
             }
+            
+            promotionListContainer.addView(promotionItem)
         }
         
         scrollView.addView(promotionListContainer)
-        dialogContent.addView(scrollView)
+        sheetContainer.addView(scrollView)
         
-        // Cancel button
-        val cancelButton = TextView(context).apply {
-            text = "Cancel"
+        // Close button
+        val closeButton = TextView(context).apply {
+            text = "Close"
             textSize = 16f
             setTextColor(Color.parseColor("#666666"))
             gravity = Gravity.CENTER
@@ -601,23 +666,46 @@ class PromotionManager(
             isFocusable = true
             
             setOnClickListener {
-                android.util.Log.d("PromotionManager", "❌ Promotions dialog cancelled")
-                container.removeView(dialogContainer)
+                android.util.Log.d("PromotionManager", "❌ Bottom sheet closed")
+                animateBottomSheetClose(sheetContainer) {
+                    container.removeView(rootView)
+                }
             }
             
-            val params = LinearLayout.LayoutParams(
+            layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 topMargin = 20
             }
-            layoutParams = params
         }
-        dialogContent.addView(cancelButton)
+        sheetContainer.addView(closeButton)
         
-        dialogContainer.addView(dialogContent)
+        // Close on background tap
+        rootView.setOnClickListener {
+            animateBottomSheetClose(sheetContainer) {
+                container.removeView(rootView)
+            }
+        }
         
-        return dialogContainer
+        rootView.addView(sheetContainer)
+        return rootView
+    }
+    
+    private fun animateBottomSheetClose(sheetContainer: LinearLayout, onComplete: () -> Unit) {
+        // Get the parent container height for animation
+        val parent = sheetContainer.parent as? ViewGroup
+        val targetTranslation = parent?.height?.toFloat() ?: 1000f
+        
+        // Animate sliding down
+        sheetContainer.animate()
+            .translationY(targetTranslation)
+            .setDuration(250)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                onComplete()
+            }
+            .start()
     }
     
     private fun isPromotionNew(createdAt: String): Boolean {
