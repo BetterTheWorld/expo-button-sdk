@@ -142,7 +142,7 @@ class PromotionManager(
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4))
+            setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
             
             // Create pill background
             val pillBackground = android.graphics.drawable.GradientDrawable().apply {
@@ -152,7 +152,6 @@ class PromotionManager(
             }
             background = pillBackground
             
-            // Make button COMPLETELY responsive - no width restrictions
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dpToPx(26)
@@ -162,35 +161,32 @@ class PromotionManager(
                 bottomMargin = dpToPx(8)
             }
             layoutParams = params
-            
+
             // Don't set click listener - Button SDK will handle this via BrowserChromeClient
         }
         
         // Icon - create custom tag icon
         val iconView = createTagIconView()
         
-        // Text - COMPLETELY flexible, no restrictions
+        // Text - completely free, no restrictions
         val textView = TextView(context).apply {
             text = badgeLabel
-            textSize = 11f
+            textSize = 10f
             setTextColor(Color.parseColor("#0B72AC")) // #0b72ac
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dpToPx(3), 0, 0, 0)
             
-            // Keep single line but remove truncation
             maxLines = 1
             setSingleLine(true)
-            ellipsize = null // No ellipsis - this is key!
+            ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
             
-            // Make TextView measure itself naturally without constraints
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             )
             layoutParams = params
             
-            // Force TextView to measure its content naturally
-            measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            // No maxWidth restriction - let it be natural
         }
         
         button.addView(iconView)
@@ -205,8 +201,8 @@ class PromotionManager(
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
             val params = LinearLayout.LayoutParams(
-                dpToPx(12),
-                dpToPx(12)
+                dpToPx(10), // Reduced from 12dp to 10dp
+                dpToPx(10)  // Reduced from 12dp to 10dp
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
