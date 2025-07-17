@@ -603,14 +603,46 @@ class PromotionManager(
             orientation = LinearLayout.VERTICAL
         }
         
-        // Add promotion items
+        // Add promotion items as cards
         promotions.forEachIndexed { index, (title, id) ->
-            val promotionItem = LinearLayout(context).apply {
+            val cardContainer = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(0, 16, 0, 16)
-                setBackgroundResource(android.R.drawable.list_selector_background)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    // Card margins
+                    setMargins(16, 8, 16, 8)
+                }
+            }
+            
+            val promotionCard = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(
+                    (16 * context.resources.displayMetrics.density).toInt(), // left
+                    (16 * context.resources.displayMetrics.density).toInt(), // top
+                    (16 * context.resources.displayMetrics.density).toInt(), // right
+                    (16 * context.resources.displayMetrics.density).toInt()  // bottom
+                )
+                
+                // Clean card styling with subtle border and rounded corners
+                val drawable = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = 12f * context.resources.displayMetrics.density
+                    setStroke(1, Color.parseColor("#E5E7EB")) // Very subtle gray border
+                }
+                background = drawable
+                
                 isClickable = true
                 isFocusable = true
+                
+                // Add subtle ripple effect for feedback
+                val rippleDrawable = android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(Color.parseColor("#10000000")),
+                    drawable,
+                    null
+                )
+                background = rippleDrawable
                 
                 setOnClickListener {
                     android.util.Log.d("PromotionManager", "🎯 Promotion selected: $id")
@@ -635,31 +667,45 @@ class PromotionManager(
                 }
             }
             
+            // Extract cashback info from title
+            val cashbackRegex = "(\\d+% Cashback)".toRegex()
+            val cashbackMatch = cashbackRegex.find(title)
+            val cashbackText = cashbackMatch?.value ?: ""
+            val cleanTitle = title.replace(cashbackRegex, "").trim()
+            
+            // Title text
             val titleView = TextView(context).apply {
-                text = title
+                text = cleanTitle
                 textSize = 16f
                 setTextColor(Color.BLACK)
-                setPadding(16, 0, 16, 0)
-                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                minHeight = (48 * context.resources.displayMetrics.density).toInt()
+                gravity = Gravity.START
+                maxLines = 2
+                minHeight = (50 * context.resources.displayMetrics.density).toInt()
             }
-            promotionItem.addView(titleView)
+            promotionCard.addView(titleView)
             
-            // Add divider (except for last item)
-            if (index < promotions.size - 1) {
-                val divider = View(context).apply {
-                    setBackgroundColor(Color.parseColor("#E0E0E0"))
+            // Add spacing between title and cashback
+            if (cashbackText.isNotEmpty()) {
+                val spacer = View(context).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
-                        1
-                    ).apply {
-                        setMargins(16, 16, 16, 0)
-                    }
+                        (12 * context.resources.displayMetrics.density).toInt()
+                    )
                 }
-                promotionItem.addView(divider)
+                promotionCard.addView(spacer)
+                
+                // Cashback text
+                val cashbackView = TextView(context).apply {
+                    text = cashbackText
+                    textSize = 18f
+                    setTextColor(Color.parseColor("#0B72AC"))
+                    gravity = Gravity.START
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                promotionCard.addView(cashbackView)
             }
-            
-            promotionListContainer.addView(promotionItem)
+            cardContainer.addView(promotionCard)
+            promotionListContainer.addView(cardContainer)
         }
         
         scrollView.addView(promotionListContainer)
