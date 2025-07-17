@@ -10,7 +10,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.FrameLayout
 import android.widget.RelativeLayout
+import android.widget.ImageView
 import android.graphics.Color
+import android.content.res.Resources
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.drawable.Drawable
 import com.usebutton.sdk.purchasepath.BrowserInterface
 import com.usebutton.sdk.purchasepath.BrowserChromeClient
 import java.text.SimpleDateFormat
@@ -136,57 +142,131 @@ class PromotionManager(
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 8, 12, 8)
-            // Don't set click listener - Button SDK will handle this via BrowserChromeClient
-        }
-        
-        // Icon
-        val iconView = TextView(context).apply {
-            text = "🏷️"
-            textSize = 16f
-            gravity = Gravity.CENTER
-        }
-        
-        // Text
-        val textView = TextView(context).apply {
-            text = badgeLabel
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            setPadding(4, 0, 4, 0)
-        }
-        
-        // Count badge with perfect circular background
-        val countView = TextView(context).apply {
-            text = count.toString()
-            textSize = 11f // Slightly larger text
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
+            setPadding(dpToPx(6), dpToPx(4), dpToPx(6), dpToPx(4))
             
-            // Create circular background
-            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.RED)
+            // Create pill background
+            val pillBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(Color.parseColor("#F9F9FB")) // #f9f9fb
+                cornerRadius = dpToPx(13).toFloat()
             }
-            background = circularBackground
+            background = pillBackground
             
+            // Make button COMPLETELY responsive - no width restrictions
             val params = LinearLayout.LayoutParams(
-                48, // Slightly larger circle
-                48  // Slightly larger circle
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(26)
             ).apply {
-                setMargins(4, 0, 0, 0)
+                gravity = Gravity.CENTER_VERTICAL
+                topMargin = dpToPx(16)
+                bottomMargin = dpToPx(8)
             }
             layoutParams = params
             
-            // Add slight bottom padding for better vertical centering
-            setPadding(0, 0, 0, 2)
+            // Don't set click listener - Button SDK will handle this via BrowserChromeClient
+        }
+        
+        // Icon - create custom tag icon
+        val iconView = createTagIconView()
+        
+        // Text - COMPLETELY flexible, no restrictions
+        val textView = TextView(context).apply {
+            text = badgeLabel
+            textSize = 11f
+            setTextColor(Color.parseColor("#0B72AC")) // #0b72ac
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(3), 0, 0, 0)
+            
+            // Keep single line but remove truncation
+            maxLines = 1
+            setSingleLine(true)
+            ellipsize = null // No ellipsis - this is key!
+            
+            // Make TextView measure itself naturally without constraints
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            layoutParams = params
+            
+            // Force TextView to measure its content naturally
+            measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         }
         
         button.addView(iconView)
         button.addView(textView)
-        button.addView(countView)
         
         return button
+    }
+    
+    private fun createTagIconView(): View {
+        val iconView = ImageView(context).apply {
+            setImageDrawable(createTagIconDrawable())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            
+            val params = LinearLayout.LayoutParams(
+                dpToPx(12),
+                dpToPx(12)
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            layoutParams = params
+        }
+        return iconView
+    }
+    
+    private fun createTagIconDrawable(): Drawable {
+        return object : Drawable() {
+            private val paint = Paint().apply {
+                color = Color.parseColor("#0B72AC")
+                style = Paint.Style.STROKE
+                strokeWidth = dpToPx(1).toFloat() // Reduce stroke to match iOS
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                isAntiAlias = true
+            }
+            
+            override fun draw(canvas: Canvas) {
+                val bounds = getBounds()
+                val scale = minOf(bounds.width(), bounds.height()) / 24f
+                
+                canvas.save()
+                canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+                canvas.scale(scale, scale)
+                
+                // Draw the exact SVG path from HTML
+                val path = Path().apply {
+                    // M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
+                    moveTo(7f, 3f)
+                    lineTo(12f, 3f)
+                    cubicTo(12.512f, 3f, 13.024f, 3.195f, 13.414f, 3.586f)
+                    lineTo(20.414f, 10.586f)
+                    cubicTo(21.195f, 11.367f, 21.195f, 12.633f, 20.414f, 13.414f)
+                    lineTo(13.414f, 20.414f)
+                    cubicTo(12.633f, 21.195f, 11.367f, 21.195f, 10.586f, 20.414f)
+                    lineTo(3.586f, 13.414f)
+                    cubicTo(3.195f, 13.024f, 3f, 12.512f, 3f, 12f)
+                    lineTo(3f, 7f)
+                    cubicTo(3f, 4.791f, 4.791f, 3f, 7f, 3f)
+                    close()
+                }
+                
+                canvas.drawPath(path, paint)
+                
+                // Draw the small dot: M7 7h.01
+                canvas.drawCircle(7f, 7f, 0.5f, paint)
+                
+                canvas.restore()
+            }
+            
+            override fun setAlpha(alpha: Int) {}
+            override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {}
+            override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+        }
+    }
+    
+    private fun dpToPx(dp: Int): Int {
+        return (dp * context.resources.displayMetrics.density).toInt()
     }
     
     private fun createPromotionOverlay(count: Int): View {
