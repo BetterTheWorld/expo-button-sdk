@@ -33,6 +33,7 @@ class PromotionManager(
     private val badgeLabel: String = "Offers",
     private val listTitle: String = "Available Promotions"
 ) {
+    private var isBottomSheetOpen = false
     
     private var currentBrowser: BrowserInterface? = null
     
@@ -483,6 +484,12 @@ class PromotionManager(
     }
     
     private fun showPromotionsBottomSheet(promotions: List<Pair<String, String>>) {
+        // Prevent multiple instances
+        if (isBottomSheetOpen) {
+            android.util.Log.d("PromotionManager", "Bottom sheet already open, ignoring request")
+            return
+        }
+
         val browser = currentBrowser ?: return
         val container = browser.viewContainer
         
@@ -492,6 +499,7 @@ class PromotionManager(
         }
         
         try {
+            isBottomSheetOpen = true
             val bottomSheetView = createBottomSheetContent(promotions, container)
             
             // Add to browser container (same as ConfirmationDialog)
@@ -514,6 +522,8 @@ class PromotionManager(
             
         } catch (e: Exception) {
             android.util.Log.e("PromotionManager", "Error creating bottom sheet overlay", e)
+            // Reset state if something went wrong
+            isBottomSheetOpen = false
         }
     }
     
@@ -607,6 +617,7 @@ class PromotionManager(
                     
                     // Animate closing
                     animateBottomSheetClose(sheetContainer) {
+                        isBottomSheetOpen = false
                         container.removeView(rootView)
                         
                         // Show global loader
@@ -657,6 +668,7 @@ class PromotionManager(
         // Close on background tap
         rootView.setOnClickListener {
             animateBottomSheetClose(sheetContainer) {
+                isBottomSheetOpen = false
                 container.removeView(rootView)
             }
         }
