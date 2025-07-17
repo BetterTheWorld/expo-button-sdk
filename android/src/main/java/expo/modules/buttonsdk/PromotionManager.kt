@@ -654,33 +654,6 @@ class PromotionManager(
         scrollView.addView(promotionListContainer)
         sheetContainer.addView(scrollView)
         
-        // Close button
-        val closeButton = TextView(context).apply {
-            text = "Close"
-            textSize = 16f
-            setTextColor(Color.parseColor("#666666"))
-            gravity = Gravity.CENTER
-            setPadding(20, 15, 20, 15)
-            setBackgroundResource(android.R.drawable.btn_default)
-            isClickable = true
-            isFocusable = true
-            
-            setOnClickListener {
-                android.util.Log.d("PromotionManager", "❌ Bottom sheet closed")
-                animateBottomSheetClose(sheetContainer) {
-                    container.removeView(rootView)
-                }
-            }
-            
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = 20
-            }
-        }
-        sheetContainer.addView(closeButton)
-        
         // Close on background tap
         rootView.setOnClickListener {
             animateBottomSheetClose(sheetContainer) {
