@@ -137,10 +137,10 @@ class PromotionManager {
     private func showPromotionsList() {
         guard let promotionData = self.promotionData else { return }
         
-        let promotionsVC = PromotionListViewController()
+        let promotionsVC = PromotionBottomSheetViewController()
         promotionsVC.promotionData = promotionData
         promotionsVC.listTitle = self.listTitle
-        promotionsVC.onPromotionSelected = { [weak self] promotionId in
+        promotionsVC.onPromotionSelected = { [weak self] (promotionId: String) in
             // Show loader immediately when promotion is tapped
             GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
             print("🔄 Global loader shown for promotion")
@@ -163,10 +163,10 @@ class PromotionManager {
         }
         
         if let viewController = getTopMostViewController() {
-            promotionsVC.modalPresentationStyle = .pageSheet
+            promotionsVC.modalPresentationStyle = UIModalPresentationStyle.pageSheet
             if #available(iOS 15.0, *) {
                 if let sheet = promotionsVC.sheetPresentationController {
-                    sheet.detents = [.medium(), .large()]
+                    sheet.detents = [UISheetPresentationController.Detent.medium(), UISheetPresentationController.Detent.large()]
                     sheet.prefersGrabberVisible = true
                 }
             }
@@ -262,8 +262,9 @@ class PromotionManager {
     }
 }
 
-// Simple custom view controller for promotions list
-class PromotionListViewController: UIViewController {
+// MARK: - PromotionBottomSheetViewController
+// Bottom Sheet component - equivalent to Android's PromotionBottomSheet.kt
+class PromotionBottomSheetViewController: UIViewController {
     
     var promotionData: NSDictionary?
     var onPromotionSelected: ((String) -> Void)?
@@ -613,16 +614,6 @@ class PromotionListViewController: UIViewController {
         iconView.layer.addSublayer(iconLayer)
         
         return iconView
-    }
-    
-    private func isPromotionNew(_ createdAt: String) -> Bool {
-        let formatter = ISO8601DateFormatter()
-        guard let createdDate = formatter.date(from: createdAt) else {
-            return false
-        }
-        
-        let twoDaysAgo = Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
-        return createdDate >= twoDaysAgo
     }
     
     private func calculateDaysDifference(_ dateStr: String) -> Int {
