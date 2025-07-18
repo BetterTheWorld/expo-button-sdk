@@ -1,20 +1,26 @@
 import ExpoModulesCore
 import Button
 import UIKit
+import WebKit
 
-class PromotionManager {
+class PromotionManager: NSObject {
     
     private var promotionData: NSDictionary?
     private var onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?
     private weak var currentBrowser: BrowserInterface?
     private var badgeLabel: String
     private var listTitle: String
+    private var badgeView: UIView?
+    private var isButtonHidden: Bool = false
+    private weak var webView: WKWebView?
+    private var displayLink: CADisplayLink?
     
     init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
         self.badgeLabel = badgeLabel ?? "Offers"
         self.listTitle = listTitle ?? "Promotions"
+        super.init()
     }
     
     func setOnPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
@@ -33,12 +39,28 @@ class PromotionManager {
         
         if totalCount > 0 {
             let badgeView = createPromotionBadge(count: totalCount)
+            self.badgeView = badgeView
             browser.header.customActionView = badgeView
             
             // Add tap gesture to badge
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(promotionsBadgeTapped))
             badgeView.addGestureRecognizer(tapGesture)
             badgeView.isUserInteractionEnabled = true
+            
+            // Setup observers for position monitoring
+            setupPositionMonitoring()
+            
+            // Setup webview scroll monitoring
+            setupWebViewScrollMonitoring(browser: browser)
+            
+            // Ensure button is visible by default
+            badgeView.alpha = 1.0
+            isButtonHidden = false
+            
+            // Check position after a short delay to ensure layout is complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.checkButtonPosition()
+            }
         }
     }
     
@@ -132,6 +154,286 @@ class PromotionManager {
     
     @objc private func promotionsBadgeTapped() {
         showPromotionsList()
+    }
+    
+    // MARK: - Position Detection Methods
+    
+    /// Check if the button is positioned too close to system icons
+    private func checkButtonPosition() {
+        guard let badgeView = self.badgeView else { 
+            return 
+        }
+        
+        // Get the button's frame in window coordinates
+        let buttonFrame = badgeView.convert(badgeView.bounds, to: nil)
+        let safeAreaInsets = getSafeAreaInsets()
+        
+        // Check if button conflicts with system areas (notch area)
+        let shouldHide = isButtonInNotchArea(buttonFrame: buttonFrame, safeAreaInsets: safeAreaInsets)
+        
+        // Only update visibility if it changed
+        if shouldHide != isButtonHidden {
+            print("🔍 Button visibility changing: \(isButtonHidden ? "hidden" : "visible") -> \(shouldHide ? "hidden" : "visible")")
+            setButtonVisibility(!shouldHide)
+        }
+    }
+    
+    /// Setup webview scroll monitoring to detect when button gets behind notch
+    private func setupWebViewScrollMonitoring(browser: BrowserInterface) {
+        print("🔍 Setting up webview scroll monitoring")
+        print("🔍 Browser type: \(type(of: browser))")
+        
+        // Try to find webview in browser hierarchy
+        if let browserView = browser as? UIView {
+            print("🔍 Browser is a UIView, searching for webview...")
+            printViewHierarchy(browserView, level: 0)
+            
+            if let webView = findWebView(in: browserView) {
+                print("🔍 ✅ Found webview: \(webView)")
+                
+                // Store reference to webview
+                self.webView = webView
+                
+                // Add scroll observer using KVO
+                webView.scrollView.addObserver(self, forKeyPath: "contentOffset", options: [.new, .old], context: nil)
+                print("🔍 ✅ KVO observer added to webview scroll")
+            } else {
+                print("🔍 ❌ Could not find webview in browser hierarchy")
+            }
+        } else {
+            print("🔍 ❌ Browser is not a UIView")
+        }
+        
+        // Alternative: Set up high-frequency position checking
+        setupHighFrequencyPositionCheck()
+    }
+    
+    /// Print view hierarchy for debugging
+    private func printViewHierarchy(_ view: UIView, level: Int) {
+        let indent = String(repeating: "  ", count: level)
+        print("🔍 \(indent)\(type(of: view))")
+        
+        if view is WKWebView {
+            print("🔍 \(indent)⭐ FOUND WEBVIEW!")
+        }
+        
+        for subview in view.subviews {
+            printViewHierarchy(subview, level: level + 1)
+        }
+    }
+    
+    /// Setup high-frequency position checking using DisplayLink for smooth scrolling
+    private func setupHighFrequencyPositionCheck() {
+        print("🔍 Setting up DisplayLink for real-time position checking")
+        
+        // Use DisplayLink for 60fps checking (most responsive)
+        displayLink = CADisplayLink(target: self, selector: #selector(displayLinkFired))
+        displayLink?.add(to: .main, forMode: .common)
+        
+        // Also setup timer as backup
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            
+            self.checkButtonPosition()
+        }
+    }
+    
+    /// Called every frame (60fps) to check button position
+    @objc private func displayLinkFired() {
+        checkButtonPosition()
+    }
+    
+    /// Find the webview in the browser view hierarchy
+    private func findWebView(in view: UIView?) -> WKWebView? {
+        guard let view = view else { return nil }
+        
+        // Check if current view is a webview
+        if let webView = view as? WKWebView {
+            return webView
+        }
+        
+        // Search in subviews
+        for subview in view.subviews {
+            if let webView = findWebView(in: subview) {
+                return webView
+            }
+        }
+        
+        return nil
+    }
+    
+    /// KVO observer for webview scroll changes
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+        if keyPath == "contentOffset" {
+            print("🔍 Webview scroll detected, checking button position")
+            DispatchQueue.main.async {
+                self.checkButtonPosition()
+            }
+        }
+    }
+    
+    /// Get the current safe area insets for the app
+    private func getSafeAreaInsets() -> UIEdgeInsets {
+        if #available(iOS 11.0, *) {
+            let window = UIApplication.shared.windows.first { $0.isKeyWindow }
+            return window?.safeAreaInsets ?? UIEdgeInsets.zero
+        }
+        return UIEdgeInsets.zero
+    }
+    
+    /// Check if the button is in the notch area (where system icons are)
+    private func isButtonInNotchArea(buttonFrame: CGRect, safeAreaInsets: UIEdgeInsets) -> Bool {
+        guard let window = UIApplication.shared.windows.first else { 
+            print("🔍 No window found")
+            return false 
+        }
+        
+        let screenBounds = window.bounds
+        let statusBarHeight = safeAreaInsets.top
+        
+        // Get the actual notch/status bar height
+        let notchHeight = max(statusBarHeight, 44) // At least 44px for status bar
+        
+        // The notch area is the entire top area where system icons live
+        let notchArea = CGRect(
+            x: 0,
+            y: 0,
+            width: screenBounds.width,
+            height: notchHeight
+        )
+        
+        // Check if button overlaps with notch area
+        let isInNotchArea = buttonFrame.intersects(notchArea)
+        
+        // ALSO check if button is in the top portion of the screen (simplified check)
+        let isInTopArea = buttonFrame.minY < notchHeight
+        
+        // Hide if button is in the notch area OR top area
+        let shouldHide = isInNotchArea || isInTopArea
+        
+        return shouldHide
+    }
+    
+    /// Force check position now (for testing)
+    public func debugCheckPosition() {
+        print("🔍 Manual position check triggered")
+        checkButtonPosition()
+    }
+    
+    /// Force hide button for testing
+    public func forceHideButton() {
+        print("🔍 Force hiding button for test")
+        setButtonVisibility(false)
+    }
+    
+    /// Force show button for testing
+    public func forceShowButton() {
+        print("🔍 Force showing button for test")
+        setButtonVisibility(true)
+    }
+    
+    /// Set the visibility of the promotion button
+    public func setButtonVisibility(_ visible: Bool) {
+        guard let badgeView = self.badgeView else { return }
+        
+        isButtonHidden = !visible
+        
+        UIView.animate(withDuration: 0.3) {
+            badgeView.alpha = visible ? 1.0 : 0.0
+        }
+        
+        print("🔍 Button visibility set to: \(visible ? "visible" : "hidden")")
+    }
+    
+    /// Public method to manually check and update button position
+    public func updateButtonPosition() {
+        checkButtonPosition()
+    }
+    
+    /// Public method to force hide/show the button
+    public func hideButton() {
+        setButtonVisibility(false)
+    }
+    
+    public func showButton() {
+        setButtonVisibility(true)
+    }
+    
+    // MARK: - Position Monitoring
+    
+    /// Setup observers for orientation changes and other events that might affect button position
+    private func setupPositionMonitoring() {
+        // Monitor orientation changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationChanged),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        
+        // Monitor app state changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        
+        // Monitor keyboard appearance (in case it affects layout)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
+    }
+    
+    /// Remove all observers when the manager is deallocated
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        
+        // Remove KVO observers
+        if let webView = self.webView {
+            webView.scrollView.removeObserver(self, forKeyPath: "contentOffset")
+        }
+        
+        // Remove DisplayLink
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+    
+    @objc private func orientationChanged() {
+        // Wait for orientation change to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.checkButtonPosition()
+        }
+    }
+    
+    @objc private func appDidBecomeActive() {
+        // Re-check position when app becomes active
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.checkButtonPosition()
+        }
+    }
+    
+    @objc private func keyboardWillShow() {
+        // Check if keyboard affects button position
+        checkButtonPosition()
+    }
+    
+    @objc private func keyboardWillHide() {
+        // Check if button needs to be shown again
+        checkButtonPosition()
     }
     
     private func showPromotionsList() {

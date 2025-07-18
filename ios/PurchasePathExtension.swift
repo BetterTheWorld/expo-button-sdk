@@ -73,6 +73,38 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
             browser.dismiss()
         }
     }
+    
+    // MARK: - Promotion Button Position Control
+    
+    /// Hide the promotion button (useful when it conflicts with system UI)
+    func hidePromotionButton() {
+        promotionManager?.hideButton()
+    }
+    
+    /// Show the promotion button
+    func showPromotionButton() {
+        promotionManager?.showButton()
+    }
+    
+    /// Manually check and update the button position
+    func updatePromotionButtonPosition() {
+        promotionManager?.updateButtonPosition()
+    }
+    
+    /// Debug method to check button position with detailed logging
+    func debugPromotionButtonPosition() {
+        promotionManager?.debugCheckPosition()
+    }
+    
+    /// Force hide button for testing
+    func forceHidePromotionButton() {
+        promotionManager?.forceHideButton()
+    }
+    
+    /// Force show button for testing
+    func forceShowPromotionButton() {
+        promotionManager?.forceShowButton()
+    }
 
     
     @objc func browserDidInitialize(_ browser: BrowserInterface) {
