@@ -116,7 +116,7 @@ startPurchasePath({
 
 ### Promotions with Deal Selection
 
-Display and handle promotion deals within the purchase path:
+Display and handle promotion deals within the purchase path with modern card-based UI:
 
 ```typescript
 const promotionData = {
@@ -124,18 +124,18 @@ const promotionData = {
   rewardText: "2% Cashback",
   featuredPromotion: {
     id: "featured-1",
-    title: "Special Sale - Up to 65% off",
-    subtitle: "Limited time offer",
-    code: "",
-    createdAt: "2025-07-07T22:00:00Z"
+    description: "Special Sale - Up to 65% off 4% Cashback",
+    couponCode: "SALE65",
+    startsAt: "2025-07-10T09:00:00Z",
+    endsAt: "2025-07-25T23:59:00Z"
   },
   promotions: [
     {
       id: "promo-1",
-      title: "New Sale Styles - Up to 50% off",
-      subtitle: "Fresh arrivals",
-      code: "SAVE20",
-      createdAt: "2024-06-15T07:00:00Z"
+      description: "New Sale Styles - Up to 50% off 3% Cashback",
+      couponCode: "SAVE20",
+      startsAt: "2025-07-15T09:00:00Z",
+      endsAt: "2025-07-30T23:59:00Z"
     }
     // ... more promotions
   ]
@@ -147,7 +147,7 @@ startPurchasePath({
   promotionData: promotionData,
   closeOnPromotionClick: true, // Default: true - closes current instance when promotion is clicked
   promotionBadgeLabel: "Deals", // Customize badge label (default: "Offers")
-  promotionListTitle: "Available Deals", // Customize list title (default: "Promotions" for iOS, "Available Promotions" for Android)
+  promotionListTitle: "Available Deals", // Customize list title (default: "Promotions")
   onPromotionClick: async (promotionId: string) => {
     console.log('Promotion clicked:', promotionId);
     
@@ -163,13 +163,36 @@ startPurchasePath({
 });
 ```
 
-### Promotion Features
+### Enhanced Promotion Features
 
-- **🏷️ Badge**: Shows promotion count in header with tag icon
-- **⭐ Featured**: Highlights featured promotions
-- **🆕 New Badge**: Shows "NEW!" for promotions created in last 2 days
-- **ActionSheet**: Native iOS list for promotion selection
-- **Auto-close**: Configurable closing of current instance when selecting new promotion
+#### 🎨 **Modern Card-based UI**
+- **Card Design**: Clean, rounded cards with subtle borders and consistent spacing
+- **Cross-platform**: Identical design and behavior on iOS and Android
+- **Material Design**: Follows modern UI principles with proper shadows and animations
+
+#### 🏷️ **Smart Time-based Labels**
+- **NEW!** - Shows green badge for promotions less than 3 days old
+- **THIS WEEK!** - Shows green badge for promotions 3-7 days old
+- **Automatic Calculation**: Based on `startsAt` date, not manual text parsing
+- **Clean Text**: Removes duplicate labels from descriptions automatically
+
+#### 💰 **Structured Information Display**
+- **Cashback Highlighting**: Automatically extracts and displays cashback percentages
+- **Promo Codes**: Displays coupon codes with tag icons in styled containers
+- **Time Remaining**: Shows countdown ("ends in 3d", "ends tomorrow", etc.)
+- **Visual Hierarchy**: Clear separation between title, benefits, and metadata
+
+#### 🎯 **Enhanced User Experience**
+- **Bottom Sheet**: Native bottom sheet presentation with smooth animations
+- **Tap Feedback**: Subtle ripple effects and touch feedback
+- **Dismiss Animation**: Smooth slide-down animation when closing
+- **Loading States**: Global loader during promotion navigation
+- **Consistent Icons**: Same tag SVG icon across header badge and promotion codes
+
+#### 📱 **Cross-platform Consistency**
+- **Unified Design**: Identical layout, spacing, and colors on iOS and Android
+- **Same Logic**: Identical date calculations and text processing
+- **Responsive**: Adapts to different screen sizes and orientations
 
 ### Promotion Customization
 

@@ -177,15 +177,32 @@ class PromotionBottomSheet(
             val startsAt = getStartsAtForPromotion(id)
             if (startsAt != null) {
                 val startDiff = calculateDaysDifference(startsAt)
+                android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Promotion: $id, startsAt: $startsAt, daysDiff: $startDiff")
                 timeLabel = when {
-                    startDiff < 3 -> "NEW!"
-                    startDiff < 7 -> "THIS WEEK!"
+                    startDiff < 3 -> {
+                        android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Setting label to NEW!")
+                        "NEW!"
+                    }
+                    startDiff <= 7 -> { // Changed from < 7 to <= 7
+                        android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Setting label to THIS WEEK!")
+                        "THIS WEEK!"
+                    }
                     else -> null
                 }
             }
             
+            // Remove time labels from title if they exist (like iOS)
+            if (timeLabel != null) {
+                val timeLabels = listOf("THIS WEEK!", "NEW!", "TODAY!")
+                for (label in timeLabels) {
+                    displayTitle = displayTitle.replace(label, "").trim()
+                }
+                android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Cleaned title: $displayTitle")
+            }
+            
             // Add time label if found
             timeLabel?.let { label ->
+                android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Creating label view for: $label")
                 val labelView = TextView(context).apply {
                     text = label
                     textSize = 12f
@@ -204,6 +221,7 @@ class PromotionBottomSheet(
                         cornerRadius = 4f * context.resources.displayMetrics.density
                     }
                     background = bgDrawable
+                    android.util.Log.d("PromotionBottomSheet", "🔍 Android Debug - Green background applied to label")
                     
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,

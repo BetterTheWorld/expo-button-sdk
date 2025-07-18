@@ -381,22 +381,32 @@ class PromotionBottomSheetViewController: UIViewController {
         titleContainer.spacing = 8
         titleContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // Get promotion data
+        // Get promotion data and clean it from existing time labels
         var title = promotion["description"] as? String ?? promotion["title"] as? String ?? "Promotion"
         
         // Calculate time label based on startsAt date (like Android)
         var timeLabel: String? = nil
         if let startsAt = promotion["startsAt"] as? String {
             let startDiff = calculateDaysDifference(startsAt)
+            print("🔍 iOS Debug - Promotion: \(promotion["id"] ?? "unknown"), startsAt: \(startsAt), daysDiff: \(startDiff)")
             if startDiff < 3 {
                 timeLabel = "NEW!"
-            } else if startDiff < 7 {
+                print("🔍 iOS Debug - Setting label to NEW!")
+            } else if startDiff <= 7 { // Changed from < 7 to <= 7
                 timeLabel = "THIS WEEK!"
+                print("🔍 iOS Debug - Setting label to THIS WEEK!")
             }
+        }
+        
+        // Remove time labels from title if they exist (like Android)
+        let timeLabels = ["THIS WEEK!", "NEW!", "TODAY!"]
+        for label in timeLabels {
+            title = title.replacingOccurrences(of: label, with: "").trimmingCharacters(in: .whitespaces)
         }
         
         // Add time label if found
         if let label = timeLabel {
+            print("🔍 iOS Debug - Creating label view for: \(label)")
             let labelView = UILabel()
             labelView.text = label
             labelView.font = UIFont.systemFont(ofSize: 12, weight: .bold)
@@ -405,6 +415,7 @@ class PromotionBottomSheetViewController: UIViewController {
             labelView.layer.cornerRadius = 4
             labelView.layer.masksToBounds = true
             labelView.textAlignment = .center
+            print("🔍 iOS Debug - Label view created with green background")
             
             // Add padding
             labelView.translatesAutoresizingMaskIntoConstraints = false
