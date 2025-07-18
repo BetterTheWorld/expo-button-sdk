@@ -181,7 +181,7 @@ class PromotionManager(
             private val paint = Paint().apply {
                 color = Color.parseColor("#0B72AC")
                 style = Paint.Style.STROKE
-                strokeWidth = dpToPx(1).toFloat()
+                strokeWidth = dpToPx(1).toFloat() // Thinner stroke
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
                 isAntiAlias = true
@@ -195,26 +195,44 @@ class PromotionManager(
                 canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
                 canvas.scale(scale, scale)
                 
-                // Create tag path (simplified version of the SVG)
+                // iOS SVG path: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                 val path = Path().apply {
-                    // Tag shape: rectangle with triangular cut on left
-                    moveTo(8f, 2f)
-                    lineTo(20f, 2f)
-                    lineTo(20f, 22f)
-                    lineTo(8f, 22f)
-                    lineTo(2f, 12f)
+                    // Start at M7 3 (moveTo 7,3)
+                    moveTo(7f, 3f)
+                    // h5 (horizontal line to 12,3)
+                    lineTo(12f, 3f)
+                    // c.512 0 1.024.195 1.414.586 (curve representing rounded corner)
+                    // Simplified as small curve
+                    lineTo(12.586f, 3.586f)
+                    // l7 7 (line 7 units right and 7 down)
+                    lineTo(19.586f, 10.586f)
+                    // a2 2 0 010 2.828 (arc representing rounded corner at tip)
+                    lineTo(19.586f, 13.414f)
+                    // l-7 7 (line 7 units left and 7 down)
+                    lineTo(12.586f, 20.414f)
+                    // a2 2 0 01-2.828 0 (arc)
+                    lineTo(9.758f, 20.414f)
+                    // l-7-7 (line 7 left, 7 up)
+                    lineTo(2.758f, 13.414f)
+                    // A1.994 1.994 0 013 12 (arc to point 3,12)
+                    lineTo(3f, 12f)
+                    // V7 (vertical line to 7)
+                    lineTo(3f, 7f)
+                    // a4 4 0 014-4 (arc back to start, completing rounded rectangle)
+                    lineTo(7f, 3f)
                     close()
                 }
                 
                 canvas.drawPath(path, paint)
                 
-                // Draw small circle for tag hole
-                val circlePaint = Paint().apply {
+                // Draw the small hole/dot inside the tag (like iOS)
+                val holePaint = Paint().apply {
                     color = Color.parseColor("#0B72AC")
                     style = Paint.Style.FILL
                     isAntiAlias = true
                 }
-                canvas.drawCircle(14f, 8f, 1.5f, circlePaint)
+                // Draw small circle representing the tag hole at (7,7)
+                canvas.drawCircle(7f, 7f, 1f, holePaint)
                 
                 canvas.restore()
             }
