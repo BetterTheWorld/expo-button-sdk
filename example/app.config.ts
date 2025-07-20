@@ -7,6 +7,7 @@ module.exports = ({ config }: ConfigContext): ExpoConfig => {
     slug: "expo-button-sdk-example",
     plugins: [
       "./plugins/withTrustLocalCerts",
+      "expo-router",
       [
         "../app.plugin.js",
         {
@@ -17,11 +18,11 @@ module.exports = ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-build-properties",
         {
-          "android": {
-            "usesCleartextTraffic": false
-          }
-        }
-      ]
+          android: {
+            usesCleartextTraffic: false,
+          },
+        },
+      ],
     ],
   };
 };

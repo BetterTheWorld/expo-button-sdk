@@ -11,17 +11,32 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     currentPromotionListener = null;
   }
 
+  // don't send promotionData if empty
+  const sanitizedOptions = { ...options };
+  if (
+    options.promotionData &&
+    !Array.isArray(options.promotionData.promotions)
+  ) {
+    console.warn(
+      "promotionData.promotions is not an array, removing promotionData to prevent crash"
+    );
+    sanitizedOptions.promotionData = undefined;
+  }
+
   // Set up new event listener if callback is provided
   if (options.onPromotionClick) {
     currentPromotionListener = ExpoButtonSdkModule.addListener(
       "onPromotionClick",
-      async (event: { promotionId: string; closeOnPromotionClick: boolean }) => {
+      async (event: {
+        promotionId: string;
+        closeOnPromotionClick: boolean;
+      }) => {
         try {
           const result = await options.onPromotionClick!(event.promotionId);
-          
+
           // Note: Browser dismiss is handled automatically on native side
           // based on closeOnPromotionClick setting
-          
+
           // Start new purchase path
           await startPurchasePath({
             ...options,
@@ -35,7 +50,7 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     );
   }
 
-  return await ExpoButtonSdkModule.startPurchasePath(options);
+  return await ExpoButtonSdkModule.startPurchasePath(sanitizedOptions);
 }
 
 export function clearAllData() {
