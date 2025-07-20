@@ -33,12 +33,12 @@ public class ExpoButtonSdkModule: Module {
             }
         }
         
-        AsyncFunction("startPurchasePath") { [weak self] (options: [Any], promise: Promise) in
-            guard let self = self,
-                  let options = options.first as? NSDictionary else {
+        AsyncFunction("startPurchasePath") { [weak self] (options: [String: Any], promise: Promise) in
+            guard let self = self else {
                 promise.reject("InvalidArguments", "startPurchasePath expects a dictionary of options.")
                 return
             }
+            let options = options as NSDictionary
             
             // Ensure Button SDK is configured
             guard ButtonSDKDelegate.isConfigured else {
