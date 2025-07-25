@@ -784,36 +784,58 @@ class PromotionBottomSheetViewController: UIViewController {
                 bottomContainer.addArrangedSubview(bulletLabel)
             }
             
-            // Promo code container with tag icon
-            let promoContainer = UIStackView()
-            promoContainer.axis = .horizontal
-            promoContainer.alignment = .center
-            promoContainer.spacing = 4
-            promoContainer.backgroundColor = UIColor(red: 0.937, green: 0.965, blue: 1.0, alpha: 1.0) // #EFF6FF blue-50
-            promoContainer.layer.cornerRadius = 4
-            promoContainer.layer.masksToBounds = true
-            promoContainer.layoutMargins = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-            promoContainer.isLayoutMarginsRelativeArrangement = true
+            // Promo code button container with tag icon
+            let promoButton = UIButton(type: .custom)
+            promoButton.backgroundColor = UIColor(red: 0.937, green: 0.965, blue: 1.0, alpha: 1.0) // #EFF6FF blue-50
+            promoButton.layer.cornerRadius = 8 // Increased from 4 for better button look
+            promoButton.layer.masksToBounds = true
+            promoButton.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12) // Increased padding
+            promoButton.translatesAutoresizingMaskIntoConstraints = false
+            
+            // Create button content stack
+            let buttonStack = UIStackView()
+            buttonStack.axis = .horizontal
+            buttonStack.alignment = .center
+            buttonStack.spacing = 4
+            buttonStack.isUserInteractionEnabled = false // Let button handle interaction
+            buttonStack.translatesAutoresizingMaskIntoConstraints = false
             
             // Add tag icon (same as header)
             let tagIcon = createTagIcon()
             tagIcon.translatesAutoresizingMaskIntoConstraints = false
-            promoContainer.addArrangedSubview(tagIcon)
+            buttonStack.addArrangedSubview(tagIcon)
             
             // Add promo code text
             let promoLabel = UILabel()
             promoLabel.text = promoCode
             promoLabel.font = UIFont.systemFont(ofSize: 10) // Smaller font, no bold
             promoLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0B72AC
-            promoContainer.addArrangedSubview(promoLabel)
+            buttonStack.addArrangedSubview(promoLabel)
             
-            // Constraints for tag icon
+            promoButton.addSubview(buttonStack)
+            
+            // Constraints for tag icon and button content
             NSLayoutConstraint.activate([
                 tagIcon.widthAnchor.constraint(equalToConstant: 12),
-                tagIcon.heightAnchor.constraint(equalToConstant: 12)
+                tagIcon.heightAnchor.constraint(equalToConstant: 12),
+                
+                // Button stack constraints
+                buttonStack.centerXAnchor.constraint(equalTo: promoButton.centerXAnchor),
+                buttonStack.centerYAnchor.constraint(equalTo: promoButton.centerYAnchor),
+                buttonStack.leadingAnchor.constraint(greaterThanOrEqualTo: promoButton.leadingAnchor, constant: 12),
+                buttonStack.trailingAnchor.constraint(lessThanOrEqualTo: promoButton.trailingAnchor, constant: -12)
             ])
             
-            bottomContainer.addArrangedSubview(promoContainer)
+            // Add button actions for press effects
+            if let promotionId = promotion["id"] as? String {
+                promoButton.addTarget(self, action: #selector(promoCodeTouchDown(_:)), for: .touchDown)
+                promoButton.addTarget(self, action: #selector(promoCodeTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+                promoButton.addTarget(self, action: #selector(promoCodeTapped(_:)), for: .touchUpInside)
+                promoButton.tag = promotionId.hashValue
+                promotionIdMap[promotionId.hashValue] = promotionId
+            }
+            
+            bottomContainer.addArrangedSubview(promoButton)
         }
         
         // Time remaining
@@ -876,6 +898,102 @@ class PromotionBottomSheetViewController: UIViewController {
         
         dismiss(animated: true) {
             self.onPromotionSelected?(promotionId)
+        }
+    }
+    
+    @objc private func promoCodeTouchDown(_ sender: UIButton) {
+        // Scale down effect on touch down
+        UIView.animate(withDuration: 0.1, animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            sender.alpha = 0.8
+        })
+    }
+    
+    @objc private func promoCodeTouchUp(_ sender: UIButton) {
+        // Scale back to normal
+        UIView.animate(withDuration: 0.1, animations: {
+            sender.transform = .identity
+            sender.alpha = 1.0
+        })
+    }
+
+    @objc private func promoCodeTapped(_ sender: UIButton) {
+        guard let promotionId = promotionIdMap[sender.tag] else { return }
+        
+        // Get promo code from promotion data
+        let promoCode = getPromoCodeForPromotionId(promotionId)
+        guard let code = promoCode, !code.isEmpty else { return }
+        
+        // Copy to clipboard
+        UIPasteboard.general.string = code
+        
+        // Show simple toast message
+        showCopiedToast(promoCode: code)
+    }
+    
+    private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {
+        guard let promotionData = self.promotionData else { return nil }
+        
+        // Check featured promotion
+        if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any],
+           let id = featuredPromotion["id"] as? String, id == promotionId {
+            return featuredPromotion["couponCode"] as? String ?? featuredPromotion["code"] as? String
+        }
+        
+        // Check regular promotions
+        let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
+        for promotion in promotions {
+            if let id = promotion["id"] as? String, id == promotionId {
+                return promotion["couponCode"] as? String ?? promotion["code"] as? String
+            }
+        }
+        
+        return nil
+    }
+    
+    private func showCopiedToast(promoCode: String) {
+        // Use system HUD - simple and reliable
+        DispatchQueue.main.async {
+            // Create a simple system-like HUD
+            guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
+            
+            let hudView = UIView()
+            hudView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+            hudView.layer.cornerRadius = 8
+            hudView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let label = UILabel()
+            label.text = "✓ \(promoCode) copied"
+            label.textColor = .white
+            label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            hudView.addSubview(label)
+            keyWindow.addSubview(hudView)
+            
+            NSLayoutConstraint.activate([
+                hudView.centerXAnchor.constraint(equalTo: keyWindow.centerXAnchor),
+                hudView.centerYAnchor.constraint(equalTo: keyWindow.centerYAnchor),
+                label.topAnchor.constraint(equalTo: hudView.topAnchor, constant: 12),
+                label.bottomAnchor.constraint(equalTo: hudView.bottomAnchor, constant: -12),
+                label.leadingAnchor.constraint(equalTo: hudView.leadingAnchor, constant: 16),
+                label.trailingAnchor.constraint(equalTo: hudView.trailingAnchor, constant: -16)
+            ])
+            
+            // Animate and auto-dismiss
+            hudView.alpha = 0
+            UIView.animate(withDuration: 0.2, animations: {
+                hudView.alpha = 1
+            }) { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    UIView.animate(withDuration: 0.2, animations: {
+                        hudView.alpha = 0
+                    }) { _ in
+                        hudView.removeFromSuperview()
+                    }
+                }
+            }
         }
     }
     
@@ -963,6 +1081,10 @@ class PromotionBottomSheetViewController: UIViewController {
         if timeDiff <= 0 { return nil }
         
         let days = Int(timeDiff / (24 * 60 * 60))
+        
+        // Hide if ends in less than 1 week (7 days)
+        if days < 7 { return nil }
+        
         let hours = Int((timeDiff.truncatingRemainder(dividingBy: 24 * 60 * 60)) / (60 * 60))
         
         switch (days, hours) {
