@@ -18,10 +18,10 @@ import android.graphics.Path
 import android.graphics.drawable.Drawable
 import com.usebutton.sdk.purchasepath.BrowserInterface
 import com.usebutton.sdk.purchasepath.BrowserChromeClient
+import expo.modules.buttonsdk.ui.PromotionBottomSheet
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
-import expo.modules.buttonsdk.ui.PromotionBottomSheet
 
 class PromotionManager(
     private val context: Context,
@@ -334,7 +334,7 @@ class PromotionManager(
                 context = context,
                 promotionData = promotionData,
                 listTitle = listTitle,
-                onPromotionClick = { promotionId ->
+                onPromotionClick = { promotionId: String ->
                     isBottomSheetOpen = false
                     
                     // Show global loader

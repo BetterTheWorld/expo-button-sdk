@@ -927,8 +927,8 @@ class PromotionBottomSheetViewController: UIViewController {
         // Copy to clipboard
         UIPasteboard.general.string = code
         
-        // Show native alert
-        showCopiedAlert(promoCode: code)
+        // Show simple toast message
+        showCopiedToast(promoCode: code)
     }
     
     private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {
@@ -951,16 +951,50 @@ class PromotionBottomSheetViewController: UIViewController {
         return nil
     }
     
-    private func showCopiedAlert(promoCode: String) {
-        let alert = UIAlertController(
-            title: "Coupon Copied",
-            message: "Your promotion code \(promoCode) was copied",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        
-        present(alert, animated: true)
+    private func showCopiedToast(promoCode: String) {
+        // Use system HUD - simple and reliable
+        DispatchQueue.main.async {
+            // Create a simple system-like HUD
+            guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
+            
+            let hudView = UIView()
+            hudView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+            hudView.layer.cornerRadius = 8
+            hudView.translatesAutoresizingMaskIntoConstraints = false
+            
+            let label = UILabel()
+            label.text = "✓ \(promoCode) copied"
+            label.textColor = .white
+            label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            hudView.addSubview(label)
+            keyWindow.addSubview(hudView)
+            
+            NSLayoutConstraint.activate([
+                hudView.centerXAnchor.constraint(equalTo: keyWindow.centerXAnchor),
+                hudView.centerYAnchor.constraint(equalTo: keyWindow.centerYAnchor),
+                label.topAnchor.constraint(equalTo: hudView.topAnchor, constant: 12),
+                label.bottomAnchor.constraint(equalTo: hudView.bottomAnchor, constant: -12),
+                label.leadingAnchor.constraint(equalTo: hudView.leadingAnchor, constant: 16),
+                label.trailingAnchor.constraint(equalTo: hudView.trailingAnchor, constant: -16)
+            ])
+            
+            // Animate and auto-dismiss
+            hudView.alpha = 0
+            UIView.animate(withDuration: 0.2, animations: {
+                hudView.alpha = 1
+            }) { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    UIView.animate(withDuration: 0.2, animations: {
+                        hudView.alpha = 0
+                    }) { _ in
+                        hudView.removeFromSuperview()
+                    }
+                }
+            }
+        }
     }
     
     private func createTagIcon() -> UIView {

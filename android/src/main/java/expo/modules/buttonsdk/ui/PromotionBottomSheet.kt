@@ -303,23 +303,30 @@ class PromotionBottomSheet(
                 }
                 bottomContainer.addView(bulletView)
                 
-                // Promo code with tag icon
-                val promoCodeContainer = LinearLayout(context).apply {
+                // Promo code button with tag icon
+                val promoCodeButton = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(
-                        (8 * context.resources.displayMetrics.density).toInt(),
-                        (4 * context.resources.displayMetrics.density).toInt(),
-                        (8 * context.resources.displayMetrics.density).toInt(),
-                        (4 * context.resources.displayMetrics.density).toInt()
+                        (12 * context.resources.displayMetrics.density).toInt(), // Increased padding
+                        (6 * context.resources.displayMetrics.density).toInt(),  // Increased padding
+                        (12 * context.resources.displayMetrics.density).toInt(), // Increased padding
+                        (6 * context.resources.displayMetrics.density).toInt()   // Increased padding
                     )
                     
-                    // Blue background
+                    // Blue background with increased corner radius
                     val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
                         setColor(Color.parseColor("#EFF6FF")) // blue-50
-                        cornerRadius = 4f * context.resources.displayMetrics.density
+                        cornerRadius = 8f * context.resources.displayMetrics.density // Increased from 4f
                     }
-                    background = bgDrawable
+                    
+                    // Add ripple effect for clickable feedback
+                    val rippleDrawable = android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(Color.parseColor("#10000000")),
+                        bgDrawable,
+                        null
+                    )
+                    background = rippleDrawable
                     
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -327,11 +334,55 @@ class PromotionBottomSheet(
                     ).apply {
                         rightMargin = (8 * context.resources.displayMetrics.density).toInt()
                     }
+                    
+                    isClickable = true
+                    isFocusable = true
+                    
+                    // Handle click with animation - consume the event to prevent parent handling
+                    setOnTouchListener { view, event ->
+                        when (event.action) {
+                            android.view.MotionEvent.ACTION_DOWN -> {
+                                // Press down animation
+                                view.animate()
+                                    .scaleX(0.95f)
+                                    .scaleY(0.95f)
+                                    .alpha(0.8f)
+                                    .setDuration(100)
+                                    .start()
+                                true // Consume the event
+                            }
+                            android.view.MotionEvent.ACTION_UP -> {
+                                // Press up animation
+                                view.animate()
+                                    .scaleX(1.0f)
+                                    .scaleY(1.0f)
+                                    .alpha(1.0f)
+                                    .setDuration(100)
+                                    .start()
+                                
+                                // Trigger click 
+                                android.util.Log.d("PromotionBottomSheet", "🎯 Promo code clicked for promotion: $id")
+                                handlePromoCodeCopy(id)
+                                true // Consume the event
+                            }
+                            android.view.MotionEvent.ACTION_CANCEL -> {
+                                // Press up animation for cancel
+                                view.animate()
+                                    .scaleX(1.0f)
+                                    .scaleY(1.0f)
+                                    .alpha(1.0f)
+                                    .setDuration(100)
+                                    .start()
+                                true // Consume the event
+                            }
+                            else -> false
+                        }
+                    }
                 }
                 
                 // Add tag icon (same as header pill)
                 val tagIcon = createHeaderTagIcon()
-                promoCodeContainer.addView(tagIcon)
+                promoCodeButton.addView(tagIcon)
                 
                 // Add promo code text
                 val promoCodeView = TextView(context).apply {
@@ -345,8 +396,8 @@ class PromotionBottomSheet(
                         leftMargin = (4 * context.resources.displayMetrics.density).toInt()
                     }
                 }
-                promoCodeContainer.addView(promoCodeView)
-                bottomContainer.addView(promoCodeContainer)
+                promoCodeButton.addView(promoCodeView)
+                bottomContainer.addView(promoCodeButton)
             }
             
             // Extract time remaining from promotion data
@@ -625,5 +676,25 @@ class PromotionBottomSheet(
             android.util.Log.e("PromotionBottomSheet", "Error calculating days difference", e)
             return Int.MAX_VALUE
         }
+    }
+    
+    private fun handlePromoCodeCopy(promotionId: String) {
+        // Get promo code for this promotion
+        val promoCode = getPromoCodeForPromotion(promotionId)
+        if (promoCode != null) {
+            // Copy to clipboard
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("Promo Code", promoCode)
+            clipboard.setPrimaryClip(clip)
+            
+            // Show simple toast message
+            showCopiedToast(promoCode)
+        }
+    }
+    
+    private fun showCopiedToast(promoCode: String) {
+        // Simple Toast message
+        val toast = android.widget.Toast.makeText(context, "✓ $promoCode copied", android.widget.Toast.LENGTH_SHORT)
+        toast.show()
     }
 }
