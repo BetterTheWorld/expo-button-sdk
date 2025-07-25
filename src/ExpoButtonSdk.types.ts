@@ -8,10 +8,10 @@ export interface ExitConfirmationConfig {
 
 export interface Promotion {
   id: string;
-  title: string;
-  subtitle?: string;
-  code?: string;
-  createdAt: string;
+  description: string;
+  couponCode?: string;
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface PromotionData {
@@ -34,7 +34,9 @@ export interface StartPurchasePathOptions {
   footerTintColor?: string;
   exitConfirmation?: ExitConfirmationConfig;
   promotionData?: PromotionData;
-  onPromotionClick?: (promotionId: string) => Promise<{ url: string; token: string }>;
+  onPromotionClick?: (
+    promotionId: string
+  ) => Promise<{ url: string; token: string }>;
   closeOnPromotionClick?: boolean; // Default: true - whether to close current instance when promotion is clicked
   promotionBadgeLabel?: string; // Label for the promotion badge (e.g., "Offers", "Deals")
   promotionListTitle?: string; // Title for the promotion list modal (e.g., "Promotions", "Available Offers")

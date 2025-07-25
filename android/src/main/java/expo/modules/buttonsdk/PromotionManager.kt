@@ -1,7 +1,6 @@
 package expo.modules.buttonsdk
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.view.Gravity
 import android.view.View
@@ -10,11 +9,19 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.FrameLayout
 import android.widget.RelativeLayout
+import android.widget.ImageView
 import android.graphics.Color
+import android.content.res.Resources
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.drawable.Drawable
 import com.usebutton.sdk.purchasepath.BrowserInterface
 import com.usebutton.sdk.purchasepath.BrowserChromeClient
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
+import expo.modules.buttonsdk.ui.PromotionBottomSheet
 
 class PromotionManager(
     private val context: Context,
@@ -23,6 +30,7 @@ class PromotionManager(
     private val badgeLabel: String = "Offers",
     private val listTitle: String = "Available Promotions"
 ) {
+    private var isBottomSheetOpen = false
     
     private var currentBrowser: BrowserInterface? = null
     
@@ -31,299 +39,216 @@ class PromotionManager(
     }
     
     fun setupPromotionsBadge(browser: BrowserInterface) {
-        promotionData ?: return
-        
-        // Store browser reference for dismiss functionality
         currentBrowser = browser
         
-        val promotions = promotionData["promotions"] as? List<*> ?: listOf<Any>()
-        val featuredPromotion = promotionData["featuredPromotion"] as? Map<String, Any>
-        val totalCount = promotions.size + if (featuredPromotion != null) 1 else 0
+        val headerActions = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
         
-        if (totalCount > 0) {
-            try {
-                // Use the official Button SDK method: setCustomActionView
-                val promotionButton = createHeaderPromotionButton(totalCount)
-                browser.header.setCustomActionView(promotionButton)
-                
-                // Set the chrome client to handle clicks (as per documentation)
-                browser.setBrowserChromeClient(object : com.usebutton.sdk.purchasepath.BrowserChromeClient() {
-                    override fun onCustomActionClick(browser: BrowserInterface, view: View) {
-                        android.util.Log.d("PromotionManager", "🎯 Custom action clicked!")
-                        showPromotionsList()
-                    }
-                    
-                    override fun onSubtitleClick(browser: BrowserInterface) {
-                        // Required override but not used
-                    }
-                })
-                
-                android.util.Log.d("PromotionManager", "✅ Successfully added custom action view to header")
-                
-            } catch (e: Exception) {
-                android.util.Log.w("PromotionManager", "❌ Could not add custom action view: ${e.message}")
-                // Fallback: modify header title
-                addPromotionToTitle(totalCount)
-            }
+        val promotionCount = getPromotionCount()
+        if (promotionCount > 0) {
+            val promotionButton = createHeaderPromotionButton(promotionCount)
+            headerActions.addView(promotionButton)
         }
-    }
-    
-    private fun hasMethod(obj: Any, methodName: String): Boolean {
-        return try {
-            obj.javaClass.getMethod(methodName, View::class.java)
-            true
-        } catch (e: NoSuchMethodException) {
-            false
-        }
-    }
-    
-    private fun addPromotionToTitle(totalCount: Int) {
+        
         try {
-            val originalTitle = currentBrowser?.header?.title?.text
-            val newTitle = if (originalTitle.isNullOrEmpty()) {
-                "🏷️ $badgeLabel ($totalCount) - Tap here"
-            } else {
-                "$originalTitle | 🏷️ $badgeLabel ($totalCount)"
-            }
-            currentBrowser?.header?.title?.text = newTitle
-            
-            // Try to make the title clickeable by accessing the underlying view
-            try {
-                val titleView = currentBrowser?.header?.title
-                // Try to get the actual TextView if possible
-                val titleTextField = titleView?.javaClass?.getDeclaredField("textView")
-                titleTextField?.isAccessible = true
-                val actualTextView = titleTextField?.get(titleView) as? TextView
-                
-                actualTextView?.setOnClickListener {
-                    android.util.Log.d("PromotionManager", "Title clicked - showing promotions!")
-                    showPromotionsList()
-                }
-                
-                android.util.Log.d("PromotionManager", "Made title clickeable")
-            } catch (e: Exception) {
-                android.util.Log.w("PromotionManager", "Could not make title clickeable: ${e.message}")
-                
-                // Alternative: try to find any clickeable parent view
-                try {
-                    val headerView = currentBrowser?.header
-                    val headerClass = headerView?.javaClass
-                    val viewField = headerClass?.getDeclaredField("view") 
-                        ?: headerClass?.getDeclaredField("headerView")
-                        ?: headerClass?.getDeclaredField("container")
-                    
-                    viewField?.isAccessible = true
-                    val actualView = viewField?.get(headerView) as? View
-                    
-                    actualView?.setOnClickListener {
-                        android.util.Log.d("PromotionManager", "Header clicked - showing promotions!")
-                        showPromotionsList()
-                    }
-                    
-                    android.util.Log.d("PromotionManager", "Made header clickeable")
-                } catch (e2: Exception) {
-                    android.util.Log.w("PromotionManager", "Could not make header clickeable: ${e2.message}")
-                }
-            }
-            
-            android.util.Log.d("PromotionManager", "Added promotions to header title")
+            browser.header.setCustomActionView(headerActions)
         } catch (e: Exception) {
-            android.util.Log.w("PromotionManager", "Could not modify header title: ${e.message}")
+            android.util.Log.e("PromotionManager", "Failed to set custom action view", e)
         }
+    }
+    
+    private fun getPromotionCount(): Int {
+        promotionData ?: return 0
+        
+        val featuredPromotion = promotionData["featuredPromotion"] as? Map<String, Any>
+        val featuredCount = if (featuredPromotion != null) 1 else 0
+        
+        val promotions = promotionData["promotions"] as? List<*>
+        val regularCount = promotions?.size ?: 0
+        
+        return featuredCount + regularCount
+    }
+    
+    private fun dpToPx(dp: Int): Int {
+        return (dp * Resources.getSystem().displayMetrics.density).toInt()
     }
     
     private fun createHeaderPromotionButton(count: Int): View {
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 8, 12, 8)
-            // Don't set click listener - Button SDK will handle this via BrowserChromeClient
+            setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
+            
+            // Create pill-shaped background with ripple effect
+            val pillBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(Color.parseColor("#F9F9FB"))
+                cornerRadius = dpToPx(13).toFloat()
+            }
+            
+            // Add subtle ripple effect
+            val rippleDrawable = android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Color.parseColor("#20000000")), // Very subtle gray ripple
+                pillBackground,
+                null
+            )
+            background = rippleDrawable
+            
+            // Make it clickable
+            isClickable = true
+            isFocusable = true
+            
+            // Add click listener to show promotions
+            setOnClickListener {
+                android.util.Log.d("PromotionManager", "Header promotion button clicked")
+                showPromotionsList()
+            }
         }
         
-        // Icon
-        val iconView = TextView(context).apply {
-            text = "🏷️"
-            textSize = 16f
-            gravity = Gravity.CENTER
-        }
+        // Add tag icon
+        val iconView = createTagIconView()
+        button.addView(iconView)
         
-        // Text
-        val textView = TextView(context).apply {
+        // Add label
+        val labelView = TextView(context).apply {
             text = badgeLabel
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            setPadding(4, 0, 4, 0)
-        }
-        
-        // Count badge with perfect circular background
-        val countView = TextView(context).apply {
-            text = count.toString()
-            textSize = 11f // Slightly larger text
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            
-            // Create circular background
-            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.RED)
-            }
-            background = circularBackground
+            textSize = 11f
+            setTextColor(Color.parseColor("#0B72AC"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             
             val params = LinearLayout.LayoutParams(
-                48, // Slightly larger circle
-                48  // Slightly larger circle
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(4, 0, 0, 0)
+                leftMargin = dpToPx(4)
+                rightMargin = if (count > 0) dpToPx(4) else 0
             }
             layoutParams = params
-            
-            // Add slight bottom padding for better vertical centering
-            setPadding(0, 0, 0, 2)
         }
+        button.addView(labelView)
         
-        button.addView(iconView)
-        button.addView(textView)
-        button.addView(countView)
+        // Add count if there are promotions
+        if (count > 0) {
+            val countView = TextView(context).apply {
+                text = count.toString()
+                textSize = 11f
+                setTextColor(Color.parseColor("#0B72AC"))
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                
+                // Create circular background
+                val circleBackground = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(Color.parseColor("#E8F4F8"))
+                }
+                background = circleBackground
+                
+                // Set size and padding for circle
+                val circleSize = dpToPx(16)
+                setPadding(dpToPx(4), dpToPx(1), dpToPx(4), dpToPx(1))
+                minWidth = circleSize
+                minHeight = circleSize
+                gravity = Gravity.CENTER
+                
+                val params = LinearLayout.LayoutParams(circleSize, circleSize)
+                layoutParams = params
+            }
+            button.addView(countView)
+        }
         
         return button
     }
     
-    private fun createPromotionOverlay(count: Int): View {
-        val overlay = FrameLayout(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            isClickable = false // Don't block other interactions
-        }
-        
-        val promotionButton = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(16, 12, 16, 12)
-            isClickable = true
-            isFocusable = true
-            setBackgroundColor(Color.parseColor("#E3F2FD")) // Light blue background
-            
-            // Position in top-right corner
-            val params = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.END
-                setMargins(0, 80, 16, 0) // Top margin to avoid header overlap
-            }
-            layoutParams = params
-        }
-        
-        // Add icon and text
-        val iconView = TextView(context).apply {
-            text = "🏷️"
-            textSize = 16f
-            gravity = Gravity.CENTER
-        }
-        
-        val textView = TextView(context).apply {
-            text = "Offers"
-            textSize = 14f
-            setTextColor(Color.BLACK)
-            gravity = Gravity.CENTER
-            setPadding(8, 0, 8, 0)
-        }
-        
-        val countView = TextView(context).apply {
-            text = count.toString()
-            textSize = 11f // Slightly larger text
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            
-            // Create circular background
-            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.RED)
-            }
-            background = circularBackground
+    private fun createTagIconView(): View {
+        val iconView = ImageView(context).apply {
+            setImageDrawable(createTagIconDrawable())
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
             
             val params = LinearLayout.LayoutParams(
-                48, // Slightly larger circle
-                48  // Slightly larger circle
-            )
+                dpToPx(14),
+                dpToPx(14)
+            ).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
             layoutParams = params
-            
-            // Add slight bottom padding for better vertical centering
-            setPadding(0, 0, 0, 2)
         }
-        
-        promotionButton.addView(iconView)
-        promotionButton.addView(textView)
-        promotionButton.addView(countView)
-        
-        // Add click listener
-        promotionButton.setOnClickListener {
-            android.util.Log.d("PromotionManager", "Promotion button clicked!")
-            showPromotionsList()
-        }
-        
-        overlay.addView(promotionButton)
-        
-        return overlay
+        return iconView
     }
     
-    private fun createPromotionButton(count: Int): View {
-        val button = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(12, 8, 12, 8)
-            isClickable = true
-            isFocusable = true
-            
-            // Add a subtle background
-            setBackgroundResource(android.R.drawable.btn_default)
-        }
-        
-        // Icon
-        val iconView = TextView(context).apply {
-            text = "🏷️"
-            textSize = 14f
-            gravity = Gravity.CENTER
-        }
-        
-        // Count badge with perfect circular background
-        val countView = TextView(context).apply {
-            text = count.toString()
-            textSize = 11f // Slightly larger text
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            
-            // Create circular background
-            val circularBackground = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.RED)
+    private fun createTagIconDrawable(): Drawable {
+        return object : Drawable() {
+            private val paint = Paint().apply {
+                color = Color.parseColor("#0B72AC")
+                style = Paint.Style.STROKE
+                strokeWidth = dpToPx(1).toFloat() // Thinner stroke
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                isAntiAlias = true
             }
-            background = circularBackground
             
-            val params = LinearLayout.LayoutParams(
-                48, // Slightly larger circle
-                48  // Slightly larger circle
-            ).apply {
-                setMargins(4, 0, 0, 0)
+            override fun draw(canvas: Canvas) {
+                val bounds = getBounds()
+                val scale = minOf(bounds.width(), bounds.height()) / 24f
+                
+                canvas.save()
+                canvas.translate(bounds.left.toFloat(), bounds.top.toFloat())
+                canvas.scale(scale, scale)
+                
+                // iOS SVG path: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                val path = Path().apply {
+                    // Start at M7 3 (moveTo 7,3)
+                    moveTo(7f, 3f)
+                    // h5 (horizontal line to 12,3)
+                    lineTo(12f, 3f)
+                    // c.512 0 1.024.195 1.414.586 (curve representing rounded corner)
+                    // Simplified as small curve
+                    lineTo(12.586f, 3.586f)
+                    // l7 7 (line 7 units right and 7 down)
+                    lineTo(19.586f, 10.586f)
+                    // a2 2 0 010 2.828 (arc representing rounded corner at tip)
+                    lineTo(19.586f, 13.414f)
+                    // l-7 7 (line 7 units left and 7 down)
+                    lineTo(12.586f, 20.414f)
+                    // a2 2 0 01-2.828 0 (arc)
+                    lineTo(9.758f, 20.414f)
+                    // l-7-7 (line 7 left, 7 up)
+                    lineTo(2.758f, 13.414f)
+                    // A1.994 1.994 0 013 12 (arc to point 3,12)
+                    lineTo(3f, 12f)
+                    // V7 (vertical line to 7)
+                    lineTo(3f, 7f)
+                    // a4 4 0 014-4 (arc back to start, completing rounded rectangle)
+                    lineTo(7f, 3f)
+                    close()
+                }
+                
+                canvas.drawPath(path, paint)
+                
+                // Draw the small hole/dot inside the tag (like iOS)
+                val holePaint = Paint().apply {
+                    color = Color.parseColor("#0B72AC")
+                    style = Paint.Style.FILL
+                    isAntiAlias = true
+                }
+                // Draw small circle representing the tag hole at (7,7)
+                canvas.drawCircle(7f, 7f, 1f, holePaint)
+                
+                canvas.restore()
             }
-            layoutParams = params
             
-            // Add slight bottom padding for better vertical centering
-            setPadding(0, 0, 0, 2)
+            override fun setAlpha(alpha: Int) {
+                paint.alpha = alpha
+            }
+            
+            override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+                paint.colorFilter = colorFilter
+            }
+            
+            override fun getOpacity(): Int {
+                return android.graphics.PixelFormat.TRANSLUCENT
+            }
         }
-        
-        button.addView(iconView)
-        button.addView(countView)
-        
-        // Add click listener
-        button.setOnClickListener {
-            showPromotionsList()
-        }
-        
-        return button
     }
     
     private fun showPromotionsList() {
@@ -338,149 +263,81 @@ class PromotionManager(
         
         // Add featured promotion if available
         featuredPromotion?.let { promo ->
-            val title = promo["title"] as? String ?: "Promotion"
+            val title = promo["description"] as? String ?: "Promotion"
             val id = promo["id"] as? String ?: ""
-            val code = promo["code"] as? String
-            val createdAt = promo["createdAt"] as? String
+            val code = promo["couponCode"] as? String
+            val startsAt = promo["startsAt"] as? String
             
             var actionTitle = title
             
             // Add NEW badge if promotion is new
-            if (createdAt != null && isPromotionNew(createdAt)) {
-                actionTitle = "🆕 $actionTitle"
+            if (startsAt != null && isPromotionNew(startsAt)) {
+                actionTitle = "⭐ $actionTitle"
             }
             
-            // Add feature indicator
-            actionTitle = "⭐ $actionTitle"
-            
-            // Add reward text if available
-            if (!rewardText.isNullOrEmpty()) {
-                actionTitle = "$actionTitle\n$rewardText"
-            }
-            
-            // Add coupon code if available
+            // Add code if available
             if (!code.isNullOrEmpty()) {
-                actionTitle = "$actionTitle\nCode: $code"
+                actionTitle = "$actionTitle"
             }
             
             promotionItems.add(Pair(actionTitle, id))
         }
         
         // Add regular promotions
-        val promotions = promotionData["promotions"] as? List<*> ?: listOf<Any>()
-        for (promotion in promotions) {
-            if (promotion is Map<*, *>) {
-                @Suppress("UNCHECKED_CAST")
-                val promotionMap = promotion as Map<String, Any>
-                val title = promotionMap["title"] as? String ?: "Promotion"
-                val id = promotionMap["id"] as? String ?: ""
-                val code = promotionMap["code"] as? String
-                val createdAt = promotionMap["createdAt"] as? String
-                
-                var actionTitle = title
-                
-                // Add NEW badge if promotion is new
-                if (createdAt != null && isPromotionNew(createdAt)) {
-                    actionTitle = "🆕 $actionTitle"
-                }
-                
-                // Add reward text if available
-                if (!rewardText.isNullOrEmpty()) {
-                    actionTitle = "$actionTitle\n$rewardText"
-                }
-                
-                // Add coupon code if available
-                if (!code.isNullOrEmpty()) {
-                    actionTitle = "$actionTitle\nCode: $code"
-                }
-                
+        val promotions = promotionData["promotions"] as? List<Map<String, Any>>
+        promotions?.forEach { promo ->
+            val title = promo["description"] as? String ?: "Promotion"
+            val id = promo["id"] as? String ?: ""
+            val code = promo["couponCode"] as? String
+            val startsAt = promo["startsAt"] as? String
+            
+            var actionTitle = title
+            
+            // Add NEW badge if promotion is new
+            if (startsAt != null && isPromotionNew(startsAt)) {
+                actionTitle = "NEW! $actionTitle"
+            }
+            
+            // Add code if available
+            if (!code.isNullOrEmpty()) {
+                actionTitle = "$actionTitle"
+            }
+            
+            if (id.isNotEmpty()) {
                 promotionItems.add(Pair(actionTitle, id))
             }
         }
         
-        // Use the browser's view container to show promotions overlay (like ConfirmationDialog)
-        showPromotionsOverlay(promotionItems)
+        // Use Bottom Sheet instead of overlay for better UX
+        showPromotionsBottomSheet(promotionItems)
     }
     
-    private fun showPromotionsOverlay(promotions: List<Pair<String, String>>) {
+    private fun showPromotionsBottomSheet(promotions: List<Pair<String, String>>) {
+        // Prevent multiple instances
+        if (isBottomSheetOpen) {
+            android.util.Log.d("PromotionManager", "Bottom sheet already open, ignoring request")
+            return
+        }
+
         val browser = currentBrowser ?: return
-        val viewContainer = browser.viewContainer ?: return
+        val container = browser.viewContainer
+        
+        if (container == null) {
+            android.util.Log.e("PromotionManager", "Could not get view container from browser")
+            return
+        }
         
         try {
-            val dialogView = createPromotionsDialogView(promotions, viewContainer)
-            viewContainer.addView(dialogView)
-            android.util.Log.d("PromotionManager", "✅ Promotions overlay added to browser container")
-        } catch (e: Exception) {
-            android.util.Log.e("PromotionManager", "❌ Error creating promotions overlay", e)
-        }
-    }
-    
-    private fun createPromotionsDialogView(promotions: List<Pair<String, String>>, container: ViewGroup): View {
-        // Create semi-transparent background overlay
-        val dialogContainer = RelativeLayout(context).apply {
-            layoutParams = RelativeLayout.LayoutParams(
-                RelativeLayout.LayoutParams.MATCH_PARENT,
-                RelativeLayout.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Color.parseColor("#80000000")) // Semi-transparent black
-        }
-        
-        // Create dialog content
-        val dialogContent = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(40, 30, 40, 30)
-            layoutParams = RelativeLayout.LayoutParams(
-                (context.resources.displayMetrics.widthPixels * 0.85).toInt(), // 85% of screen width
-                RelativeLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                addRule(RelativeLayout.CENTER_IN_PARENT)
-            }
-        }
-        
-        // Title
-        val titleView = TextView(context).apply {
-            text = listTitle
-            textSize = 18f
-            setTextColor(Color.BLACK)
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 20)
-        }
-        dialogContent.addView(titleView)
-        
-        // Scrollable promotion list with improved styling
-        val maxHeight = (context.resources.displayMetrics.heightPixels * 0.4).toInt() // 40% of screen height
-        val scrollView = android.widget.ScrollView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                maxHeight
-            )
-            isScrollbarFadingEnabled = false // Always show scrollbar for better UX
-        }
-        
-        val promotionListContainer = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        
-        // Add promotion items with dividers
-        promotions.forEachIndexed { index, (title, id) ->
-            val promotionButton = TextView(context).apply {
-                text = title
-                textSize = 14f
-                setTextColor(Color.BLACK)
-                setPadding(20, 18, 20, 18) // Slightly more padding for better touch target
-                gravity = Gravity.START
-                setBackgroundResource(android.R.drawable.list_selector_background)
-                isClickable = true
-                isFocusable = true
-                
-                setOnClickListener {
-                    android.util.Log.d("PromotionManager", "🎯 Promotion selected: $id")
+            isBottomSheetOpen = true
+            
+            val bottomSheet = PromotionBottomSheet(
+                context = context,
+                promotionData = promotionData,
+                listTitle = listTitle,
+                onPromotionClick = { promotionId ->
+                    isBottomSheetOpen = false
                     
-                    // Remove the overlay
-                    container.removeView(dialogContainer)
-                    
-                    // Show global loader over everything (including WebView)
+                    // Show global loader
                     val activity = context as? Activity
                     if (activity != null) {
                         GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
@@ -488,73 +345,53 @@ class PromotionManager(
                     }
                     
                     // Call the promotion click callback
-                    android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $id")
-                    onPromotionClickCallback?.invoke(id, currentBrowser)
+                    android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
+                    onPromotionClickCallback?.invoke(promotionId, currentBrowser)
                     android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
+                },
+                onClose = {
+                    isBottomSheetOpen = false
                 }
-            }
-            promotionListContainer.addView(promotionButton)
+            )
             
-            // Add divider between items (except after the last item)
-            if (index < promotions.size - 1) {
-                val divider = View(context).apply {
-                    setBackgroundColor(Color.parseColor("#E0E0E0")) // Light gray divider
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1 // 1dp height
-                    ).apply {
-                        setMargins(20, 0, 20, 0) // Indent divider to match content padding
-                    }
-                }
-                promotionListContainer.addView(divider)
-            }
+            val bottomSheetView = bottomSheet.createBottomSheetContent(promotions, container)
+            
+            // Add to browser container (same as ConfirmationDialog)
+            container.addView(bottomSheetView)
+            
+            // Animate the bottom sheet sliding up from bottom
+            val sheetChild = (bottomSheetView as RelativeLayout).getChildAt(0)
+            
+            // Set initial position off-screen at the bottom
+            sheetChild?.translationY = container.height.toFloat()
+            
+            // Animate sliding up
+            sheetChild?.animate()
+                ?.translationY(0f)
+                ?.setDuration(300)
+                ?.setInterpolator(android.view.animation.DecelerateInterpolator())
+                ?.start()
+            
+            android.util.Log.d("PromotionManager", "Bottom sheet overlay added successfully with animation")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionManager", "Error creating bottom sheet overlay", e)
+            // Reset state if something went wrong
+            isBottomSheetOpen = false
         }
-        
-        scrollView.addView(promotionListContainer)
-        dialogContent.addView(scrollView)
-        
-        // Cancel button
-        val cancelButton = TextView(context).apply {
-            text = "Cancel"
-            textSize = 16f
-            setTextColor(Color.parseColor("#666666"))
-            gravity = Gravity.CENTER
-            setPadding(20, 15, 20, 15)
-            setBackgroundResource(android.R.drawable.btn_default)
-            isClickable = true
-            isFocusable = true
-            
-            setOnClickListener {
-                android.util.Log.d("PromotionManager", "❌ Promotions dialog cancelled")
-                container.removeView(dialogContainer)
-            }
-            
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = 20
-            }
-            layoutParams = params
-        }
-        dialogContent.addView(cancelButton)
-        
-        dialogContainer.addView(dialogContent)
-        
-        return dialogContainer
     }
     
-    private fun isPromotionNew(createdAt: String): Boolean {
+    private fun isPromotionNew(startsAt: String): Boolean {
         return try {
-            val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
+            val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
             formatter.timeZone = TimeZone.getTimeZone("UTC")
-            val createdDate = formatter.parse(createdAt) ?: return false
+            val startDate = formatter.parse(startsAt) ?: return false
             
             val twoDaysAgo = Calendar.getInstance().apply {
                 add(Calendar.DAY_OF_YEAR, -2)
             }.time
             
-            createdDate >= twoDaysAgo
+            startDate >= twoDaysAgo
         } catch (e: Exception) {
             false
         }
