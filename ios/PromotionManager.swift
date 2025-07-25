@@ -1082,8 +1082,8 @@ class PromotionBottomSheetViewController: UIViewController {
         
         let days = Int(timeDiff / (24 * 60 * 60))
         
-        // Hide if ends in less than 1 week (7 days)
-        if days < 7 { return nil }
+        // Hide if ends in more than 1 week (7 days) - only show if ≤ 7 days
+        if days > 7 { return nil }
         
         let hours = Int((timeDiff.truncatingRemainder(dividingBy: 24 * 60 * 60)) / (60 * 60))
         
