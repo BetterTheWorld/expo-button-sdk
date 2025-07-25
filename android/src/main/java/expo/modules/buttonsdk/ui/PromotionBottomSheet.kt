@@ -556,6 +556,10 @@ class PromotionBottomSheet(
             if (timeDiff <= 0) return null
             
             val days = TimeUnit.MILLISECONDS.toDays(timeDiff)
+            
+            // Hide if ends in less than 1 week (7 days)
+            if (days < 7) return null
+            
             val hours = TimeUnit.MILLISECONDS.toHours(timeDiff) % 24
             
             when {

@@ -23,7 +23,7 @@ export const MOCK_PROMOTION_DATA: PromotionData = {
     id: "9482",
     couponCode: "SHOP20",
     description: "THIS WEEK! Take 20% off Sitewide 4% Cashback",
-    endsAt: "2025-07-21T03:59:00Z",
+    endsAt: "2025-09-21T03:59:00Z",
     startsAt: "2025-07-11T17:00:00Z",
   },
   promotions: [
