@@ -153,11 +153,21 @@ class PromotionBottomSheet(
                 }
             }
             
-            // Extract cashback info from title
-            val cashbackRegex = "(\\d+% Cashback)".toRegex()
-            val cashbackMatch = cashbackRegex.find(title)
-            val cashbackText = cashbackMatch?.value ?: ""
-            val cleanTitle = title.replace(cashbackRegex, "").trim()
+            // Extract cashback info from promotion data (like iOS)
+            var cashbackText = ""
+            
+            // Get cashback from reward text or description, like iOS
+            val promoData = getPromotionData(id)
+            if (promoData != null) {
+                val rewardText = promoData["rewardText"] as? String ?: promoData["description"] as? String ?: ""
+                if (rewardText.isNotEmpty()) {
+                    val cashbackRegex = "(\\d+% Cashback)".toRegex()
+                    val cashbackMatch = cashbackRegex.find(rewardText)
+                    cashbackText = cashbackMatch?.value ?: ""
+                }
+            }
+            
+            val cleanTitle = title
             
             // Create title container with potential time label
             val titleContainer = LinearLayout(context).apply {
@@ -288,20 +298,22 @@ class PromotionBottomSheet(
             
             // Extract promo code from promotion data
             val promoCode = getPromoCodeForPromotion(id)
-            if (promoCode != null) {
-                // Add bullet separator
-                val bulletView = TextView(context).apply {
-                    text = "•"
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#6B7280")) // gray-500
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        rightMargin = (8 * context.resources.displayMetrics.density).toInt()
+            if (promoCode != null && promoCode.isNotEmpty()) {
+                // Add bullet separator only if there's cashback text
+                if (cashbackText.isNotEmpty()) {
+                    val bulletView = TextView(context).apply {
+                        text = "•"
+                        textSize = 14f
+                        setTextColor(Color.parseColor("#6B7280")) // gray-500
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            rightMargin = (8 * context.resources.displayMetrics.density).toInt()
+                        }
                     }
+                    bottomContainer.addView(bulletView)
                 }
-                bottomContainer.addView(bulletView)
                 
                 // Promo code button with tag icon
                 val promoCodeButton = LinearLayout(context).apply {
@@ -403,19 +415,21 @@ class PromotionBottomSheet(
             // Extract time remaining from promotion data
             val timeRemaining = getTimeRemainingForPromotion(id)
             if (timeRemaining != null) {
-                // Add bullet separator before time
-                val bulletView2 = TextView(context).apply {
-                    text = "•"
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#6B7280")) // gray-500
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        rightMargin = (8 * context.resources.displayMetrics.density).toInt()
+                // Add bullet separator before time only if there's cashback or promo code
+                if (cashbackText.isNotEmpty() || (promoCode != null && promoCode.isNotEmpty())) {
+                    val bulletView2 = TextView(context).apply {
+                        text = "•"
+                        textSize = 14f
+                        setTextColor(Color.parseColor("#6B7280")) // gray-500
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            rightMargin = (8 * context.resources.displayMetrics.density).toInt()
+                        }
                     }
+                    bottomContainer.addView(bulletView2)
                 }
-                bottomContainer.addView(bulletView2)
                 
                 // Time remaining
                 val timeView = TextView(context).apply {
@@ -551,24 +565,29 @@ class PromotionBottomSheet(
         }
     }
     
-    private fun getPromoCodeForPromotion(promotionId: String): String? {
+    private fun getPromotionData(promotionId: String): Map<String, Any>? {
         promotionData ?: return null
         
         // Check featured promotion
         val featuredPromotion = promotionData["featuredPromotion"] as? Map<String, Any>
         if (featuredPromotion != null && featuredPromotion["id"] == promotionId) {
-            return featuredPromotion["couponCode"] as? String
+            return featuredPromotion
         }
         
         // Check regular promotions
         val promotions = promotionData["promotions"] as? List<Map<String, Any>>
         promotions?.forEach { promotion ->
             if (promotion["id"] == promotionId) {
-                return promotion["couponCode"] as? String
+                return promotion
             }
         }
         
         return null
+    }
+    
+    private fun getPromoCodeForPromotion(promotionId: String): String? {
+        val promotion = getPromotionData(promotionId) ?: return null
+        return promotion["couponCode"] as? String ?: promotion["code"] as? String
     }
     
     private fun getTimeRemainingForPromotion(promotionId: String): String? {
@@ -608,8 +627,8 @@ class PromotionBottomSheet(
             
             val days = TimeUnit.MILLISECONDS.toDays(timeDiff)
             
-            // Hide if ends in less than 1 week (7 days)
-            if (days < 7) return null
+            // Hide if ends in more than 1 week (7 days) - only show if ≤ 7 days
+            if (days > 7) return null
             
             val hours = TimeUnit.MILLISECONDS.toHours(timeDiff) % 24
             

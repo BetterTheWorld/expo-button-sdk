@@ -21,7 +21,7 @@ export const MOCK_PROMOTION_DATA: PromotionData = {
   rewardText: "2% Cashback",
   featuredPromotion: {
     id: "9482",
-    couponCode: "SHOP20",
+    couponCode: "",
     description: "THIS WEEK! Take 20% off Sitewide 4% Cashback",
     endsAt: "2025-09-21T03:59:00Z",
     startsAt: "2025-07-11T17:00:00Z",
@@ -78,7 +78,7 @@ export const MOCK_PROMOTION_DATA: PromotionData = {
     },
     {
       id: "1008",
-      couponCode: "LOYALTY",
+      couponCode: "",
       description: "Loyalty Members - Extra 15% off 6% Cashback",
       endsAt: "2025-07-28T23:59:00Z",
       startsAt: "2025-07-10T09:00:00Z",
