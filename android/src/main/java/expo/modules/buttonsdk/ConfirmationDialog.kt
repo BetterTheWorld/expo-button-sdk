@@ -14,6 +14,9 @@ import android.widget.TextView
 import android.graphics.Color
 import android.view.Gravity
 import android.widget.RelativeLayout
+import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
+import android.util.TypedValue
 
 import com.usebutton.sdk.purchasepath.BrowserInterface
 
@@ -77,87 +80,192 @@ object ConfirmationDialog {
         browser: BrowserInterface,
         container: ViewGroup
     ): View {
-        // Create semi-transparent background
+        val density = context.resources.displayMetrics.density
+        
+        // Background overlay
         val dialogContainer = RelativeLayout(context).apply {
             layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT,
                 RelativeLayout.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(Color.parseColor("#80000000")) // Semi-transparent black
+            setBackgroundColor(Color.parseColor("#80000000"))
+            
+            // Background tap to dismiss
+            setOnClickListener {
+                Log.d("ConfirmationDialog", "Background tapped - user chose to stay")
+                container.removeView(this)
+            }
         }
         
-        // Create dialog content
-        val dialogContent = LinearLayout(context).apply {
+        // Modal container with rounded corners and shadow
+        val modalContainer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
-            setPadding(60, 40, 60, 40)
+            
+            // Modal background
+            val background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = 12 * density
+            }
+            setBackground(background)
+            
+            // More padding (32dp equivalent)
+            val paddingPx = (32 * density).toInt()
+            setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
+            
             layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.WRAP_CONTENT,
                 RelativeLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 addRule(RelativeLayout.CENTER_IN_PARENT)
+                // Add margins so modal doesn't touch screen edges
+                val marginPx = (20 * density).toInt()
+                setMargins(marginPx, marginPx, marginPx, marginPx)
+            }
+            
+            // Consume clicks
+            setOnClickListener { /* consume click */ }
+        }
+        
+        // Title section container
+        val titleSection = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            val bottomMarginPx = (24 * density).toInt()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, bottomMarginPx)
             }
         }
         
-        // Title
+        // Main title (bold, centered, larger)
         val titleView = TextView(context).apply {
             text = title
-            textSize = 18f
-            setTextColor(Color.BLACK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setTextColor(Color.parseColor("#1C1C1C"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            typeface = Typeface.DEFAULT_BOLD
+            val bottomMarginPx = (8 * density).toInt()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, bottomMarginPx)
+            }
         }
         
-        // Message
+        // Subtitle (smaller, darker gray)
         val messageView = TextView(context).apply {
             text = message
-            textSize = 14f
-            setTextColor(Color.GRAY)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(Color.parseColor("#282B30"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         
-        // Buttons container
+        // Button container (horizontal, equal width)
         val buttonsContainer = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         
         // Stay button
-        val stayButton = Button(context).apply {
-            text = stayButtonLabel
-            setOnClickListener {
-                Log.d("ConfirmationDialog", "User chose to stay")
-                container.removeView(dialogContainer)
-            }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginEnd = 20
-            }
+        val stayButton = createStyledButton(context, stayButtonLabel, true) {
+            Log.d("ConfirmationDialog", "User chose to stay")
+            container.removeView(dialogContainer)
         }
         
         // Leave button
-        val leaveButton = Button(context).apply {
-            text = leaveButtonLabel
-            setOnClickListener {
-                Log.d("ConfirmationDialog", "User chose to leave")
-                container.removeView(dialogContainer)
-                browser.dismiss()
-            }
+        val leaveButton = createStyledButton(context, leaveButtonLabel, false) {
+            Log.d("ConfirmationDialog", "User chose to leave")
+            container.removeView(dialogContainer)
+            browser.dismiss()
         }
         
-        // Assemble the dialog
+        // Button spacing
+        val spacingPx = (8 * density).toInt()
+        stayButton.layoutParams = LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1f
+        ).apply {
+            marginEnd = spacingPx / 2
+        }
+        
+        leaveButton.layoutParams = LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1f
+        ).apply {
+            marginStart = spacingPx / 2
+        }
+        
+        // Assemble modal
+        titleSection.addView(titleView)
+        titleSection.addView(messageView)
+        
         buttonsContainer.addView(stayButton)
         buttonsContainer.addView(leaveButton)
         
-        dialogContent.addView(titleView)
-        dialogContent.addView(messageView)
-        dialogContent.addView(buttonsContainer)
+        modalContainer.addView(titleSection)
+        modalContainer.addView(buttonsContainer)
         
-        dialogContainer.addView(dialogContent)
+        dialogContainer.addView(modalContainer)
         
         return dialogContainer
+    }
+    
+    private fun createStyledButton(
+        context: Context,
+        text: String,
+        isStayButton: Boolean,
+        onClick: () -> Unit
+    ): Button {
+        val density = context.resources.displayMetrics.density
+        
+        return Button(context).apply {
+            this.text = text
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT
+            
+            // Button styling
+            val background = GradientDrawable().apply {
+                cornerRadius = 8 * density
+                if (isStayButton) {
+                    // Stay button
+                    setColor(Color.parseColor("#074a7b"))
+                } else {
+                    // Leave button
+                    setColor(Color.parseColor("#FEF7F7"))
+                    setStroke((1 * density).toInt(), Color.parseColor("#F5D5D5"))
+                }
+            }
+            setBackground(background)
+            
+            // Text color
+            if (isStayButton) {
+                setTextColor(Color.WHITE)
+            } else {
+                setTextColor(Color.parseColor("#CB2727"))
+            }
+            
+            // Padding
+            val verticalPaddingPx = (12 * density).toInt()
+            val horizontalPaddingPx = (16 * density).toInt()
+            setPadding(horizontalPaddingPx, verticalPaddingPx, horizontalPaddingPx, verticalPaddingPx)
+            
+            setOnClickListener { onClick() }
+            
+            // Remove default styling
+            stateListAnimator = null
+            elevation = 0f
+        }
     }
 }

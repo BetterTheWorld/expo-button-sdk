@@ -36,11 +36,9 @@ class GlobalLoaderManager private constructor() {
             // Get the root view of the activity (this will be above everything including WebView)
             val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
             
-            // Create loader overlay
             val loaderOverlay = createLoaderView(activity, message)
             currentLoaderView = loaderOverlay
             
-            // Add to root view so it appears above everything
             rootView.addView(loaderOverlay)
             
             android.util.Log.d("GlobalLoaderManager", "✅ Loader shown over root view")
@@ -77,11 +75,10 @@ class GlobalLoaderManager private constructor() {
             isFocusable = true
         }
         
-        // Loader container with custom rounded background
         val loaderContainer = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(80, 60, 80, 60) // More generous padding
+            setPadding(80, 60, 80, 60)
             
             // Create custom rounded background
             val roundedBackground = GradientDrawable().apply {
@@ -93,13 +90,12 @@ class GlobalLoaderManager private constructor() {
             }
             background = roundedBackground
             
-            // Center in screen with margin from edges
             val params = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER
-                setMargins(48, 48, 48, 48) // Larger margin from screen edges
+                setMargins(48, 48, 48, 48)
             }
             layoutParams = params
             
@@ -113,20 +109,18 @@ class GlobalLoaderManager private constructor() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                bottomMargin = 40 // More spacing below progress bar
+                bottomMargin = 40
             }
-            // Make progress bar slightly larger
             scaleX = 1.2f
             scaleY = 1.2f
         }
         
-        // Loading text with better typography
         val loadingText = TextView(activity).apply {
             text = message
-            textSize = 17f // Slightly larger text
-            setTextColor(Color.parseColor("#2C2C2C")) // Darker, more readable color
+            textSize = 17f
+            setTextColor(Color.parseColor("#2C2C2C"))
             gravity = Gravity.CENTER
-            setPadding(24, 0, 24, 0) // More horizontal padding
+            setPadding(24, 0, 24, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
