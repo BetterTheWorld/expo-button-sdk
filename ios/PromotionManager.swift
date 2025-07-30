@@ -576,6 +576,7 @@ class PromotionBottomSheetViewController: UIViewController {
     private let contentView = UIView()
     private let stackView = UIStackView()
     private var promotionIdMap: [Int: String] = [:]
+    private var promotionDataMap: [Int: [String: Any]] = [:]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -832,6 +833,7 @@ class PromotionBottomSheetViewController: UIViewController {
                 promoButton.addTarget(self, action: #selector(promoCodeTapped(_:)), for: .touchUpInside)
                 promoButton.tag = promotionId.hashValue
                 promotionIdMap[promotionId.hashValue] = promotionId
+                promotionDataMap[promotionId.hashValue] = promotion
             }
             
             bottomContainer.addArrangedSubview(promoButton)
@@ -868,6 +870,7 @@ class PromotionBottomSheetViewController: UIViewController {
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cardTapped(_:)))
             cardContainer.tag = tag
             promotionIdMap[tag] = promotionId
+            promotionDataMap[tag] = promotion
             cardContainer.addGestureRecognizer(tapGesture)
             cardContainer.isUserInteractionEnabled = true
         }
@@ -893,8 +896,21 @@ class PromotionBottomSheetViewController: UIViewController {
     
     @objc private func cardTapped(_ gesture: UITapGestureRecognizer) {
         guard let view = gesture.view,
-              let promotionId = promotionIdMap[view.tag] else { return }
+              let promotionId = promotionIdMap[view.tag],
+              let promotion = promotionDataMap[view.tag] else { return }
         
+        // Check if promotion has a coupon code
+        let promoCode = promotion["couponCode"] as? String ?? promotion["code"] as? String
+        
+        if let code = promoCode, !code.isEmpty {
+            // Copy code to clipboard
+            UIPasteboard.general.string = code
+            
+            // Show copied toast
+            showCopiedToast(promoCode: code)
+        }
+        
+        // Always execute callback immediately
         dismiss(animated: true) {
             self.onPromotionSelected?(promotionId)
         }
@@ -951,48 +967,10 @@ class PromotionBottomSheetViewController: UIViewController {
     }
     
     private func showCopiedToast(promoCode: String) {
-        // Use system HUD
+        // Create persistent toast that survives WebView dismissals
         DispatchQueue.main.async {
-            // Create HUD
-            guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
-            
-            let hudView = UIView()
-            hudView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-            hudView.layer.cornerRadius = 8
-            hudView.translatesAutoresizingMaskIntoConstraints = false
-            
-            let label = UILabel()
-            label.text = "✓ \(promoCode) copied"
-            label.textColor = .white
-            label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            hudView.addSubview(label)
-            keyWindow.addSubview(hudView)
-            
-            NSLayoutConstraint.activate([
-                hudView.centerXAnchor.constraint(equalTo: keyWindow.centerXAnchor),
-                hudView.centerYAnchor.constraint(equalTo: keyWindow.centerYAnchor),
-                label.topAnchor.constraint(equalTo: hudView.topAnchor, constant: 12),
-                label.bottomAnchor.constraint(equalTo: hudView.bottomAnchor, constant: -12),
-                label.leadingAnchor.constraint(equalTo: hudView.leadingAnchor, constant: 16),
-                label.trailingAnchor.constraint(equalTo: hudView.trailingAnchor, constant: -16)
-            ])
-            
-            // Animate and auto-dismiss
-            hudView.alpha = 0
-            UIView.animate(withDuration: 0.2, animations: {
-                hudView.alpha = 1
-            }) { _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    UIView.animate(withDuration: 0.2, animations: {
-                        hudView.alpha = 0
-                    }) { _ in
-                        hudView.removeFromSuperview()
-                    }
-                }
-            }
+            // Use GlobalLoaderManager's approach to get the highest level window
+            PersistentToastManager.shared.showToast(message: "✓ \(promoCode) copied", duration: 4.0)
         }
     }
     
@@ -1097,6 +1075,88 @@ class PromotionBottomSheetViewController: UIViewController {
             return "ends in 1h"
         default:
             return "ends today"
+        }
+    }
+}
+
+// MARK: - PersistentToastManager
+class PersistentToastManager {
+    static let shared = PersistentToastManager()
+    
+    private var currentToastWindow: UIWindow?
+    
+    private init() {}
+    
+    func showToast(message: String, duration: TimeInterval) {
+        // Remove any existing toast
+        hideToast()
+        
+        // Create a new window that's above everything
+        let toastWindow = UIWindow(frame: UIScreen.main.bounds)
+        toastWindow.windowLevel = UIWindow.Level.alert + 1000 // Above everything
+        toastWindow.backgroundColor = UIColor.clear
+        toastWindow.isHidden = false
+        
+        // Create toast container
+        let toastContainer = UIView()
+        toastContainer.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        toastContainer.layer.cornerRadius = 12
+        toastContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Create label
+        let label = UILabel()
+        label.text = message
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Assemble views
+        toastContainer.addSubview(label)
+        toastWindow.addSubview(toastContainer)
+        
+        // Setup constraints - bottom right position (almost touching bottom)
+        NSLayoutConstraint.activate([
+            toastContainer.trailingAnchor.constraint(equalTo: toastWindow.trailingAnchor, constant: -20),
+            toastContainer.bottomAnchor.constraint(equalTo: toastWindow.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            toastContainer.leadingAnchor.constraint(greaterThanOrEqualTo: toastWindow.leadingAnchor, constant: 40),
+            
+            label.topAnchor.constraint(equalTo: toastContainer.topAnchor, constant: 16),
+            label.bottomAnchor.constraint(equalTo: toastContainer.bottomAnchor, constant: -16),
+            label.leadingAnchor.constraint(equalTo: toastContainer.leadingAnchor, constant: 20),
+            label.trailingAnchor.constraint(equalTo: toastContainer.trailingAnchor, constant: -20)
+        ])
+        
+        // Store reference
+        currentToastWindow = toastWindow
+        
+        // Animate in from right
+        toastContainer.alpha = 0
+        toastContainer.transform = CGAffineTransform(translationX: 100, y: 0)
+        
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: [], animations: {
+            toastContainer.alpha = 1
+            toastContainer.transform = .identity
+        }, completion: nil)
+        
+        // Auto-dismiss after duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            self.hideToast()
+        }
+    }
+    
+    func hideToast() {
+        guard let toastWindow = currentToastWindow,
+              let toastContainer = toastWindow.subviews.first else { return }
+        
+        // Animate out to right
+        UIView.animate(withDuration: 0.3, animations: {
+            toastContainer.alpha = 0
+            toastContainer.transform = CGAffineTransform(translationX: 100, y: 0)
+        }) { _ in
+            toastWindow.isHidden = true
+            self.currentToastWindow = nil
         }
     }
 }
