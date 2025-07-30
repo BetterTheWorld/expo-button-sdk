@@ -10,7 +10,7 @@ class GlobalLoaderManager {
     private init() {}
     
     func showLoader(message: String = "Loading promotion...") {
-        hideLoader() // Remove any existing loader first
+        hideLoader()
         
         DispatchQueue.main.async { [weak self] in
             self?.createAndShowLoader(message: message)
@@ -24,7 +24,7 @@ class GlobalLoaderManager {
     }
     
     private func createAndShowLoader(message: String) {
-        // Get the key window to show loader above everything
+        // Get key window
         guard let keyWindow = getKeyWindow() else {
             print("❌ GlobalLoaderManager: Could not find key window")
             return
@@ -32,12 +32,12 @@ class GlobalLoaderManager {
         
         currentWindow = keyWindow
         
-        // Create overlay that covers the entire screen
+        // Screen overlay
         let overlay = UIView()
         overlay.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         overlay.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create loader container
+        // Loader container
         let loaderContainer = UIView()
         loaderContainer.backgroundColor = UIColor.white
         loaderContainer.layer.cornerRadius = 12
@@ -47,7 +47,7 @@ class GlobalLoaderManager {
         loaderContainer.layer.shadowRadius = 8
         loaderContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create activity indicator
+        // Activity indicator
         let activityIndicator = UIActivityIndicatorView(style: .large)
         activityIndicator.color = UIColor.systemBlue
         activityIndicator.startAnimating()

@@ -29,7 +29,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.headerTitle = options["headerTitle"] as? String
         self.headerSubtitle = options["headerSubtitle"] as? String
         
-        // Assuming color values are provided as hex strings:
+        // Parse color values
         self.headerTitleColor = (options["headerTitleColor"] as? String).flatMap { UIColor(hex: $0) }
         self.headerSubtitleColor = (options["headerSubtitleColor"] as? String).flatMap { UIColor(hex: $0) }
         self.headerBackgroundColor = (options["headerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }

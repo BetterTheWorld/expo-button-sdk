@@ -42,7 +42,7 @@ class PromotionManager: NSObject {
             self.badgeView = badgeView
             browser.header.customActionView = badgeView
             
-            // Add tap gesture to badge
+            // Tap gesture
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(promotionsBadgeTapped))
             badgeView.addGestureRecognizer(tapGesture)
             badgeView.isUserInteractionEnabled = true
@@ -57,7 +57,7 @@ class PromotionManager: NSObject {
             badgeView.alpha = 1.0
             isButtonHidden = false
             
-            // Check position after a short delay to ensure layout is complete
+            // Check position after layout
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.checkButtonPosition()
             }
@@ -70,7 +70,7 @@ class PromotionManager: NSObject {
         containerView.layer.cornerRadius = 13
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create icon + text stack
+        // Icon and text stack
         let iconView = createTagIcon()
         iconView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -109,7 +109,7 @@ class PromotionManager: NSObject {
         let iconLayer = CAShapeLayer()
         let path = UIBezierPath()
         
-        // Create exact SVG path from HTML (scaled to 12x12)
+        // SVG path scaled to 12x12
         let scale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
         
         // Main tag shape path: M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
@@ -136,7 +136,7 @@ class PromotionManager: NSObject {
                      controlPoint2: CGPoint(x: 4.791 * scale, y: 3 * scale))
         path.close()
         
-        // Add the small dot: M7 7h.01
+        // Small dot
         let dotPath = UIBezierPath(ovalIn: CGRect(x: 7 * scale - 0.5, y: 7 * scale - 0.5, width: 1, height: 1))
         path.append(dotPath)
         
@@ -489,7 +489,7 @@ class PromotionManager: NSObject {
             title = "⭐ \(title)"
         }
         
-        // Add reward text if available
+        // Reward text
         if let reward = rewardText, !reward.isEmpty {
             title = "\(title)\n\(reward)"
         }
@@ -640,23 +640,21 @@ class PromotionBottomSheetViewController: UIViewController {
     private func setupPromotions() {
         guard let promotionData = self.promotionData else { return }
         
-        let rewardText = promotionData["rewardText"] as? String
-        
         // Add featured promotion if available
         if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any] {
-            let promotionView = createPromotionView(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
+            let promotionView = createPromotionView(promotion: featuredPromotion, isFeature: true)
             stackView.addArrangedSubview(promotionView)
         }
         
         // Add regular promotions
         let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
         for promotion in promotions {
-            let promotionView = createPromotionView(promotion: promotion, isFeature: false, rewardText: rewardText)
+            let promotionView = createPromotionView(promotion: promotion, isFeature: false)
             stackView.addArrangedSubview(promotionView)
         }
     }
     
-    private func createPromotionView(promotion: [String: Any], isFeature: Bool, rewardText: String?) -> UIView {
+    private func createPromotionView(promotion: [String: Any], isFeature: Bool) -> UIView {
         // Card container with Android-like design
         let cardContainer = UIView()
         cardContainer.backgroundColor = UIColor.systemBackground
@@ -735,11 +733,11 @@ class PromotionBottomSheetViewController: UIViewController {
             titleContainer.addArrangedSubview(paddingView)
         }
         
-        // Title text
+        // Title
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = UIFont.systemFont(ofSize: 16)
-        titleLabel.textColor = UIColor(red: 0.220, green: 0.255, blue: 0.318, alpha: 1.0) // #374151 gray-900
+        titleLabel.textColor = UIColor(red: 0.220, green: 0.255, blue: 0.318, alpha: 1.0)
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byWordWrapping
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -754,22 +752,23 @@ class PromotionBottomSheetViewController: UIViewController {
         bottomContainer.spacing = 8
         bottomContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // Extract cashback from reward text or title
+        // Extract cashback from promotion's own rewardText or description (like Android)
         var cashbackText = ""
-        if let reward = rewardText, !reward.isEmpty {
+        let promotionRewardText = promotion["rewardText"] as? String ?? promotion["description"] as? String ?? ""
+        if !promotionRewardText.isEmpty {
             let cashbackRegex = try! NSRegularExpression(pattern: "(\\d+% Cashback)")
-            let range = NSRange(location: 0, length: reward.count)
-            if let match = cashbackRegex.firstMatch(in: reward, range: range) {
-                cashbackText = String(reward[Range(match.range, in: reward)!])
+            let range = NSRange(location: 0, length: promotionRewardText.count)
+            if let match = cashbackRegex.firstMatch(in: promotionRewardText, range: range) {
+                cashbackText = String(promotionRewardText[Range(match.range, in: promotionRewardText)!])
             }
         }
         
-        // Cashback text
+        // Cashback
         if !cashbackText.isEmpty {
             let cashbackLabel = UILabel()
             cashbackLabel.text = cashbackText
-            cashbackLabel.font = UIFont.systemFont(ofSize: 14) // Larger than ends in (12), no bold
-            cashbackLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0B72AC
+            cashbackLabel.font = UIFont.systemFont(ofSize: 14)
+            cashbackLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0)
             bottomContainer.addArrangedSubview(cashbackLabel)
         }
         
@@ -805,11 +804,11 @@ class PromotionBottomSheetViewController: UIViewController {
             tagIcon.translatesAutoresizingMaskIntoConstraints = false
             buttonStack.addArrangedSubview(tagIcon)
             
-            // Add promo code text
+            // Promo code text
             let promoLabel = UILabel()
             promoLabel.text = promoCode
-            promoLabel.font = UIFont.systemFont(ofSize: 10) // Smaller font, no bold
-            promoLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0B72AC
+            promoLabel.font = UIFont.systemFont(ofSize: 10)
+            promoLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0)
             buttonStack.addArrangedSubview(promoLabel)
             
             promoButton.addSubview(buttonStack)
@@ -927,7 +926,7 @@ class PromotionBottomSheetViewController: UIViewController {
         // Copy to clipboard
         UIPasteboard.general.string = code
         
-        // Show simple toast message
+        // Show toast message
         showCopiedToast(promoCode: code)
     }
     
@@ -952,9 +951,9 @@ class PromotionBottomSheetViewController: UIViewController {
     }
     
     private func showCopiedToast(promoCode: String) {
-        // Use system HUD - simple and reliable
+        // Use system HUD
         DispatchQueue.main.async {
-            // Create a simple system-like HUD
+            // Create HUD
             guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
             
             let hudView = UIView()
@@ -1004,7 +1003,7 @@ class PromotionBottomSheetViewController: UIViewController {
         let iconLayer = CAShapeLayer()
         let path = UIBezierPath()
         
-        // Create exact SVG path from HTML (scaled to 12x12)
+        // SVG path scaled to 12x12
         let scale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
         
         // Main tag shape path: M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
@@ -1031,7 +1030,7 @@ class PromotionBottomSheetViewController: UIViewController {
                      controlPoint2: CGPoint(x: 4.791 * scale, y: 3 * scale))
         path.close()
         
-        // Add the small dot: M7 7h.01
+        // Small dot
         let dotPath = UIBezierPath(ovalIn: CGRect(x: 7 * scale - 0.5, y: 7 * scale - 0.5, width: 1, height: 1))
         path.append(dotPath)
         
