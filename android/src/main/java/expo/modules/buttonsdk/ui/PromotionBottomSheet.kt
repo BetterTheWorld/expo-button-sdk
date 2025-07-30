@@ -712,8 +712,42 @@ class PromotionBottomSheet(
     }
     
     private fun showCopiedToast(promoCode: String) {
-        // Simple Toast message
-        val toast = android.widget.Toast.makeText(context, "✓ $promoCode copied", android.widget.Toast.LENGTH_SHORT)
+        // Create a custom layout programmatically to ensure styling is applied reliably
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                (20 * context.resources.displayMetrics.density).toInt(),
+                (12 * context.resources.displayMetrics.density).toInt(),
+                (20 * context.resources.displayMetrics.density).toInt(),
+                (12 * context.resources.displayMetrics.density).toInt()
+            )
+
+            // Create the background drawable programmatically
+            val backgroundDrawable = android.graphics.drawable.GradientDrawable().apply {
+                setColor(Color.parseColor("#CC000000")) // Black with 80% opacity
+                cornerRadius = 12f * context.resources.displayMetrics.density // 12dp corner radius
+            }
+            background = backgroundDrawable
+        }
+
+        // Create the text view for the message
+        val textView = TextView(context).apply {
+            text = "✓ $promoCode copied"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+        }
+
+        layout.addView(textView)
+
+        // Create and show the toast with the custom layout
+        val toast = android.widget.Toast(context).apply {
+            duration = android.widget.Toast.LENGTH_LONG
+            // Position the toast at the bottom-right, with offsets to mimic the iOS version
+            val xOffset = (20 * context.resources.displayMetrics.density).toInt()
+            val yOffset = (40 * context.resources.displayMetrics.density).toInt() // Extra offset from bottom
+            setGravity(android.view.Gravity.BOTTOM or android.view.Gravity.END, xOffset, yOffset)
+            view = layout
+        }
         toast.show()
     }
 }
