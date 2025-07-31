@@ -355,7 +355,8 @@ class PromotionManager(
                             android.util.Log.d("PromotionManager", "🔄 Copy loader shown for promotion with code: $sharedPendingPromoCode")
                         } else {
                             // For promotions without promo code, show loader and hide after 3 seconds
-                            GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
+                            val promotionLoaderColor = Color.parseColor("#0B72AC") // Use the promotion blue color
+                            GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...", promotionLoaderColor)
                             android.util.Log.d("PromotionManager", "🔄 Generic loader shown for promotion without code")
                             
                             // Hide generic loader after exactly 3 seconds too

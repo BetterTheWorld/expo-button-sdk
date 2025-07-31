@@ -27,7 +27,7 @@ class GlobalLoaderManager private constructor() {
     private var currentLoaderView: View? = null
     private var currentActivity: Activity? = null
     
-    fun showLoader(activity: Activity, message: String = "Loading promotion...") {
+    fun showLoader(activity: Activity, message: String = "Loading promotion...", loaderColor: Int? = null) {
         try {
             hideLoader() // Remove any existing loader first
             
@@ -36,7 +36,7 @@ class GlobalLoaderManager private constructor() {
             // Get the root view of the activity (this will be above everything including WebView)
             val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
             
-            val loaderOverlay = createLoaderView(activity, message)
+            val loaderOverlay = createLoaderView(activity, message, loaderColor)
             currentLoaderView = loaderOverlay
             
             rootView.addView(loaderOverlay)
@@ -84,7 +84,7 @@ class GlobalLoaderManager private constructor() {
         }
     }
     
-    private fun createLoaderView(activity: Activity, message: String): View {
+    private fun createLoaderView(activity: Activity, message: String, loaderColor: Int?): View {
         // Semi-transparent background overlay that covers everything
         val overlay = FrameLayout(activity).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -134,6 +134,9 @@ class GlobalLoaderManager private constructor() {
             }
             scaleX = 1.2f
             scaleY = 1.2f
+            loaderColor?.let {
+                indeterminateTintList = android.content.res.ColorStateList.valueOf(it)
+            }
         }
         
         val loadingText = TextView(activity).apply {
@@ -207,7 +210,7 @@ class GlobalLoaderManager private constructor() {
             }
             scaleX = 1.2f
             scaleY = 1.2f
-            indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#007AFF"))
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0B72AC"))
         }
         
         // "Copying to clipboard..." text
