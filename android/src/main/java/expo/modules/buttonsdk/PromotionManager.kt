@@ -350,9 +350,9 @@ class PromotionManager(
                     val activity = context as? Activity
                     if (activity != null) {
                         if (sharedPendingPromoCode != null && sharedPendingPromoCode!!.isNotEmpty()) {
-                            // For promotions with promo code, just show generic loader (copy logic handled in showPendingPromoCodeToast)
-                            GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
-                            android.util.Log.d("PromotionManager", "🔄 Generic loader shown for promotion with code")
+                            // For promotions with promo code, show copy loader with promo code pill
+                            GlobalLoaderManager.getInstance().showCopyLoader(activity, sharedPendingPromoCode!!)
+                            android.util.Log.d("PromotionManager", "🔄 Copy loader shown for promotion with code: $sharedPendingPromoCode")
                         } else {
                             // For promotions without promo code, show loader and hide after 3 seconds
                             GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
@@ -361,15 +361,17 @@ class PromotionManager(
                             // Hide generic loader after exactly 3 seconds too
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                                 GlobalLoaderManager.getInstance().hideLoader()
-                                android.util.Log.d("PromotionManager", "🔄 Generic loader hidden after 3 seconds (forced)")
-                            }, 3000) // 3 seconds
+                                android.util.Log.d("PromotionManager", "🔄 Generic loader hidden after 2 seconds (forced)")
+                            }, 2000) // 2 seconds
                         }
                     }
                     
-                    // Call the promotion click callback
-                    android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
-                    onPromotionClickCallback?.invoke(promotionId, currentBrowser)
-                    android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
+                    // Call the promotion click callback after 1 second delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
+                        onPromotionClickCallback?.invoke(promotionId, currentBrowser)
+                        android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
+                    }, 1000) // 1 second delay
                 },
                 onClose = {
                     isBottomSheetOpen = false
@@ -484,8 +486,8 @@ class PromotionManager(
         // Hide loader after exactly 3 seconds, no matter what
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             GlobalLoaderManager.getInstance().hideLoader()
-            android.util.Log.d("PromotionManager", "🔄 Loader hidden after 3 seconds (forced)")
-        }, 3000) // 3 seconds
+            android.util.Log.d("PromotionManager", "🔄 Loader hidden after 2 seconds (forced)")
+        }, 2000) // 2 seconds
         
         // Clear the pending code after showing
         sharedPendingPromoCode = null
