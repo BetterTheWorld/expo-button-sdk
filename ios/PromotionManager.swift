@@ -15,6 +15,10 @@ class PromotionManager: NSObject {
     private weak var webView: WKWebView?
     private var displayLink: CADisplayLink?
     
+    // Shared promo code state across all instances
+    private static var sharedPendingPromoCode: String?
+    private static var copiedPromoCode: String?
+    
     init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
@@ -29,6 +33,8 @@ class PromotionManager: NSObject {
     
     func setupPromotionsBadge(for browser: BrowserInterface) {
         guard let promotionData = self.promotionData else { return }
+        
+        print("🔄 setupPromotionsBadge called, sharedPendingPromoCode: \(PromotionManager.sharedPendingPromoCode ?? "nil")")
         
         // Store browser reference for dismiss functionality
         self.currentBrowser = browser
@@ -362,6 +368,83 @@ class PromotionManager: NSObject {
         setButtonVisibility(true)
     }
     
+    private func savePromoCodeForPromotion(promotionId: String) {
+        guard let promotionData = self.promotionData else {
+            print("🔄 No promotion data available")
+            return
+        }
+        
+        PromotionManager.sharedPendingPromoCode = nil
+        
+        // Find the promotion and save its code
+        // Check featured promotion first
+        if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any],
+           let featuredId = featuredPromotion["id"] as? String, featuredId == promotionId {
+            let promoCode = featuredPromotion["couponCode"] as? String ?? featuredPromotion["code"] as? String
+            if let code = promoCode, !code.isEmpty {
+                PromotionManager.sharedPendingPromoCode = code
+                print("🔄 Saved promo code for featured promotion: \(code)")
+                return
+            }
+        }
+        
+        // Check regular promotions
+        let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
+        for promotion in promotions {
+            if let id = promotion["id"] as? String, id == promotionId {
+                let promoCode = promotion["couponCode"] as? String ?? promotion["code"] as? String
+                if let code = promoCode, !code.isEmpty {
+                    PromotionManager.sharedPendingPromoCode = code
+                    print("🔄 Saved promo code for promotion: \(code)")
+                    return
+                }
+            }
+        }
+        
+        print("🔄 No promo code found for promotion ID: \(promotionId)")
+    }
+    
+    public func showPendingPromoCodeToast() {
+        print("🔄 showPendingPromoCodeToast called, sharedPendingPromoCode: \(PromotionManager.sharedPendingPromoCode ?? "nil")")
+        guard let promoCode = PromotionManager.sharedPendingPromoCode else {
+            print("🔄 No pending promo code to show")
+            return
+        }
+        
+        // Copy to clipboard immediately
+        UIPasteboard.general.string = promoCode
+        PromotionManager.copiedPromoCode = promoCode
+        print("🔄 Promo code copied: \(promoCode)")
+        
+        // Show toast immediately when Button SDK opens
+        PersistentToastManager.shared.showToast(message: "✓ \(promoCode) copied", duration: 2.0)
+        print("🔄 Toast shown immediately when Button SDK opened")
+        
+        // Hide loader after exactly 3 seconds, no matter what
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            GlobalLoaderManager.shared.hideLoader()
+            print("🔄 Loader hidden after 2 seconds (forced)")
+        }
+        
+        // Clear the pending code after showing
+        PromotionManager.sharedPendingPromoCode = nil
+    }
+    
+    /// Show toast if there was a promo code copied
+    public func showCopiedToastIfNeeded() {
+        guard let copiedCode = PromotionManager.copiedPromoCode else {
+            print("🔄 No copied promo code to show toast for")
+            return
+        }
+        
+        // Show success toast with 2 second duration
+        PersistentToastManager.shared.showToast(message: "✓ \(copiedCode) copied", duration: 2.0)
+        print("🔄 Showed success toast for copied promo code: \(copiedCode)")
+        
+        // Clear the copied code after showing toast
+        PromotionManager.copiedPromoCode = nil
+    }
+    
     // MARK: - Position Monitoring
     
     /// Setup observers for orientation changes and other events that might affect button position
@@ -443,19 +526,37 @@ class PromotionManager: NSObject {
         promotionsVC.promotionData = promotionData
         promotionsVC.listTitle = self.listTitle
         promotionsVC.onPromotionSelected = { [weak self] (promotionId: String) in
-            // Show loader immediately when promotion is tapped
-            GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
-            print("🔄 Global loader shown for promotion")
+            // Save the promo code for this promotion to show toast later
+            self?.savePromoCodeForPromotion(promotionId: promotionId)
+            
+            // Show appropriate loader based on whether promotion has promo code
+            if let promoCode = PromotionManager.sharedPendingPromoCode, !promoCode.isEmpty {
+                // Show copy loader with promo code pill
+                GlobalLoaderManager.shared.showCopyLoader(promoCode: promoCode)
+                print("🔄 Copy loader shown for promotion with code: \(promoCode)")
+            } else {
+                // Show generic loader for promotions without promo code
+                GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
+                print("🔄 Generic loader shown for promotion without code")
+                
+                // Hide generic loader after exactly 3 seconds too
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    GlobalLoaderManager.shared.hideLoader()
+                    print("🔄 Generic loader hidden after 2 seconds (forced)")
+                }
+            }
             
             // FORCE close current browser first, then execute callback
             if let browser = self?.currentBrowser {
                 print("🔄 Forcing browser close before promotion")
-                browser.dismiss() // Force immediate close
-                
-                // Wait for browser to fully close, then execute callback
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("🔄 Executing promotion callback after forced browser close")
-                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    browser.dismiss()
+                    
+                    // Wait for browser to fully close, then execute callback
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        print("🔄 Executing promotion callback after forced browser close")
+                        self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                    }
                 }
             } else {
                 // No current browser, execute immediately
@@ -896,21 +997,9 @@ class PromotionBottomSheetViewController: UIViewController {
     
     @objc private func cardTapped(_ gesture: UITapGestureRecognizer) {
         guard let view = gesture.view,
-              let promotionId = promotionIdMap[view.tag],
-              let promotion = promotionDataMap[view.tag] else { return }
+              let promotionId = promotionIdMap[view.tag] else { return }
         
-        // Check if promotion has a coupon code
-        let promoCode = promotion["couponCode"] as? String ?? promotion["code"] as? String
-        
-        if let code = promoCode, !code.isEmpty {
-            // Copy code to clipboard
-            UIPasteboard.general.string = code
-            
-            // Show copied toast
-            showCopiedToast(promoCode: code)
-        }
-        
-        // Always execute callback immediately
+        // Just execute callback - no copy/toast here
         dismiss(animated: true) {
             self.onPromotionSelected?(promotionId)
         }
@@ -933,17 +1022,8 @@ class PromotionBottomSheetViewController: UIViewController {
     }
 
     @objc private func promoCodeTapped(_ sender: UIButton) {
-        guard let promotionId = promotionIdMap[sender.tag] else { return }
-        
-        // Get promo code from promotion data
-        let promoCode = getPromoCodeForPromotionId(promotionId)
-        guard let code = promoCode, !code.isEmpty else { return }
-        
-        // Copy to clipboard
-        UIPasteboard.general.string = code
-        
-        // Show toast message
-        showCopiedToast(promoCode: code)
+        // No action needed - copy/toast will happen later in browserDidInitialize
+        return
     }
     
     private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {
@@ -966,13 +1046,6 @@ class PromotionBottomSheetViewController: UIViewController {
         return nil
     }
     
-    private func showCopiedToast(promoCode: String) {
-        // Create persistent toast that survives WebView dismissals
-        DispatchQueue.main.async {
-            // Use GlobalLoaderManager's approach to get the highest level window
-            PersistentToastManager.shared.showToast(message: "✓ \(promoCode) copied", duration: 4.0)
-        }
-    }
     
     private func createTagIcon() -> UIView {
         let iconView = UIView()

@@ -105,6 +105,19 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     func forceShowPromotionButton() {
         promotionManager?.forceShowButton()
     }
+    
+    /// Show toast if there was a promo code copied during navigation
+    private func showToastIfPromoCodeWasCopied() {
+        // Check if there's a copied promo code to show toast for
+        if let _ = UIPasteboard.general.string, let promotionManager = self.promotionManager {
+            // Check if we had a promo code that was supposed to be copied
+            // We'll use a simple check - if clipboard has content and we just finished navigation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // Try to show toast from promotion manager (it has the logic)
+                promotionManager.showCopiedToastIfNeeded()
+            }
+        }
+    }
 
     
     @objc func browserDidInitialize(_ browser: BrowserInterface) {
@@ -123,8 +136,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
         
-        // Setup promotions badge if available
         promotionManager?.setupPromotionsBadge(for: browser)
+        
+        self.promotionManager?.showPendingPromoCodeToast()
     }
     
     func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
@@ -133,8 +147,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #endif
         // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            GlobalLoaderManager.shared.hideLoader()
-            print("🔄 Global loader hidden on page navigation complete (2s delay)")
+            // Don't hide loader here - it will be hidden after 3 seconds by PromotionManager
+            print("🔄 Navigation complete (2s delay) - loader managed by PromotionManager")
         }
     }
     
@@ -144,8 +158,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #endif
         // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            GlobalLoaderManager.shared.hideLoader()
-            print("🔄 Global loader hidden on product page navigation complete (2s delay)")
+            // Don't hide loader here - it will be hidden after 3 seconds by PromotionManager
+            print("🔄 Product navigation complete (2s delay) - loader managed by PromotionManager")
         }
     }
     
@@ -155,8 +169,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 #endif
         // Wait 2 seconds after URL loads to ensure Button SDK window is fully visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            GlobalLoaderManager.shared.hideLoader()
-            print("🔄 Global loader hidden on purchase page navigation complete (2s delay)")
+            // Don't hide loader here - it will be hidden after 3 seconds by PromotionManager
+            print("🔄 Purchase navigation complete (2s delay) - loader managed by PromotionManager")
         }
     }
     
