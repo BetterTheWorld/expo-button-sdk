@@ -15,6 +15,10 @@ class PromotionManager: NSObject {
     private weak var webView: WKWebView?
     private var displayLink: CADisplayLink?
     
+    // Shared promo code state across all instances
+    private static var sharedPendingPromoCode: String?
+    private static var copiedPromoCode: String?
+    
     init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
@@ -30,6 +34,8 @@ class PromotionManager: NSObject {
     func setupPromotionsBadge(for browser: BrowserInterface) {
         guard let promotionData = self.promotionData else { return }
         
+        print("🔄 setupPromotionsBadge called, sharedPendingPromoCode: \(PromotionManager.sharedPendingPromoCode ?? "nil")")
+        
         // Store browser reference for dismiss functionality
         self.currentBrowser = browser
         
@@ -42,7 +48,7 @@ class PromotionManager: NSObject {
             self.badgeView = badgeView
             browser.header.customActionView = badgeView
             
-            // Add tap gesture to badge
+            // Tap gesture
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(promotionsBadgeTapped))
             badgeView.addGestureRecognizer(tapGesture)
             badgeView.isUserInteractionEnabled = true
@@ -57,7 +63,7 @@ class PromotionManager: NSObject {
             badgeView.alpha = 1.0
             isButtonHidden = false
             
-            // Check position after a short delay to ensure layout is complete
+            // Check position after layout
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.checkButtonPosition()
             }
@@ -70,7 +76,7 @@ class PromotionManager: NSObject {
         containerView.layer.cornerRadius = 13
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create icon + text stack
+        // Icon and text stack
         let iconView = createTagIcon()
         iconView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -109,7 +115,7 @@ class PromotionManager: NSObject {
         let iconLayer = CAShapeLayer()
         let path = UIBezierPath()
         
-        // Create exact SVG path from HTML (scaled to 12x12)
+        // SVG path scaled to 12x12
         let scale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
         
         // Main tag shape path: M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
@@ -136,7 +142,7 @@ class PromotionManager: NSObject {
                      controlPoint2: CGPoint(x: 4.791 * scale, y: 3 * scale))
         path.close()
         
-        // Add the small dot: M7 7h.01
+        // Small dot
         let dotPath = UIBezierPath(ovalIn: CGRect(x: 7 * scale - 0.5, y: 7 * scale - 0.5, width: 1, height: 1))
         path.append(dotPath)
         
@@ -362,6 +368,83 @@ class PromotionManager: NSObject {
         setButtonVisibility(true)
     }
     
+    private func savePromoCodeForPromotion(promotionId: String) {
+        guard let promotionData = self.promotionData else {
+            print("🔄 No promotion data available")
+            return
+        }
+        
+        PromotionManager.sharedPendingPromoCode = nil
+        
+        // Find the promotion and save its code
+        // Check featured promotion first
+        if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any],
+           let featuredId = featuredPromotion["id"] as? String, featuredId == promotionId {
+            let promoCode = featuredPromotion["couponCode"] as? String ?? featuredPromotion["code"] as? String
+            if let code = promoCode, !code.isEmpty {
+                PromotionManager.sharedPendingPromoCode = code
+                print("🔄 Saved promo code for featured promotion: \(code)")
+                return
+            }
+        }
+        
+        // Check regular promotions
+        let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
+        for promotion in promotions {
+            if let id = promotion["id"] as? String, id == promotionId {
+                let promoCode = promotion["couponCode"] as? String ?? promotion["code"] as? String
+                if let code = promoCode, !code.isEmpty {
+                    PromotionManager.sharedPendingPromoCode = code
+                    print("🔄 Saved promo code for promotion: \(code)")
+                    return
+                }
+            }
+        }
+        
+        print("🔄 No promo code found for promotion ID: \(promotionId)")
+    }
+    
+    public func showPendingPromoCodeToast() {
+        print("🔄 showPendingPromoCodeToast called, sharedPendingPromoCode: \(PromotionManager.sharedPendingPromoCode ?? "nil")")
+        guard let promoCode = PromotionManager.sharedPendingPromoCode else {
+            print("🔄 No pending promo code to show")
+            return
+        }
+        
+        // Copy to clipboard immediately
+        UIPasteboard.general.string = promoCode
+        PromotionManager.copiedPromoCode = promoCode
+        print("🔄 Promo code copied: \(promoCode)")
+        
+        // Show toast immediately when Button SDK opens
+        PersistentToastManager.shared.showToast(message: "✓ \(promoCode) copied", duration: 2.0)
+        print("🔄 Toast shown immediately when Button SDK opened")
+        
+        // Hide loader after exactly 3 seconds, no matter what
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            GlobalLoaderManager.shared.hideLoader()
+            print("🔄 Loader hidden after 2 seconds (forced)")
+        }
+        
+        // Clear the pending code after showing
+        PromotionManager.sharedPendingPromoCode = nil
+    }
+    
+    /// Show toast if there was a promo code copied
+    public func showCopiedToastIfNeeded() {
+        guard let copiedCode = PromotionManager.copiedPromoCode else {
+            print("🔄 No copied promo code to show toast for")
+            return
+        }
+        
+        // Show success toast with 2 second duration
+        PersistentToastManager.shared.showToast(message: "✓ \(copiedCode) copied", duration: 2.0)
+        print("🔄 Showed success toast for copied promo code: \(copiedCode)")
+        
+        // Clear the copied code after showing toast
+        PromotionManager.copiedPromoCode = nil
+    }
+    
     // MARK: - Position Monitoring
     
     /// Setup observers for orientation changes and other events that might affect button position
@@ -443,19 +526,37 @@ class PromotionManager: NSObject {
         promotionsVC.promotionData = promotionData
         promotionsVC.listTitle = self.listTitle
         promotionsVC.onPromotionSelected = { [weak self] (promotionId: String) in
-            // Show loader immediately when promotion is tapped
-            GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
-            print("🔄 Global loader shown for promotion")
+            // Save the promo code for this promotion to show toast later
+            self?.savePromoCodeForPromotion(promotionId: promotionId)
+            
+            // Show appropriate loader based on whether promotion has promo code
+            if let promoCode = PromotionManager.sharedPendingPromoCode, !promoCode.isEmpty {
+                // Show copy loader with promo code pill
+                GlobalLoaderManager.shared.showCopyLoader(promoCode: promoCode)
+                print("🔄 Copy loader shown for promotion with code: \(promoCode)")
+            } else {
+                // Show generic loader for promotions without promo code
+                GlobalLoaderManager.shared.showLoader(message: "Loading promotion...")
+                print("🔄 Generic loader shown for promotion without code")
+                
+                // Hide generic loader after exactly 3 seconds too
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    GlobalLoaderManager.shared.hideLoader()
+                    print("🔄 Generic loader hidden after 2 seconds (forced)")
+                }
+            }
             
             // FORCE close current browser first, then execute callback
             if let browser = self?.currentBrowser {
                 print("🔄 Forcing browser close before promotion")
-                browser.dismiss() // Force immediate close
-                
-                // Wait for browser to fully close, then execute callback
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("🔄 Executing promotion callback after forced browser close")
-                    self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    browser.dismiss()
+                    
+                    // Wait for browser to fully close, then execute callback
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        print("🔄 Executing promotion callback after forced browser close")
+                        self?.onPromotionClickCallback?(promotionId, self?.currentBrowser)
+                    }
                 }
             } else {
                 // No current browser, execute immediately
@@ -489,7 +590,7 @@ class PromotionManager: NSObject {
             title = "⭐ \(title)"
         }
         
-        // Add reward text if available
+        // Reward text
         if let reward = rewardText, !reward.isEmpty {
             title = "\(title)\n\(reward)"
         }
@@ -576,6 +677,7 @@ class PromotionBottomSheetViewController: UIViewController {
     private let contentView = UIView()
     private let stackView = UIStackView()
     private var promotionIdMap: [Int: String] = [:]
+    private var promotionDataMap: [Int: [String: Any]] = [:]
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -640,23 +742,21 @@ class PromotionBottomSheetViewController: UIViewController {
     private func setupPromotions() {
         guard let promotionData = self.promotionData else { return }
         
-        let rewardText = promotionData["rewardText"] as? String
-        
         // Add featured promotion if available
         if let featuredPromotion = promotionData["featuredPromotion"] as? [String: Any] {
-            let promotionView = createPromotionView(promotion: featuredPromotion, isFeature: true, rewardText: rewardText)
+            let promotionView = createPromotionView(promotion: featuredPromotion, isFeature: true)
             stackView.addArrangedSubview(promotionView)
         }
         
         // Add regular promotions
         let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
         for promotion in promotions {
-            let promotionView = createPromotionView(promotion: promotion, isFeature: false, rewardText: rewardText)
+            let promotionView = createPromotionView(promotion: promotion, isFeature: false)
             stackView.addArrangedSubview(promotionView)
         }
     }
     
-    private func createPromotionView(promotion: [String: Any], isFeature: Bool, rewardText: String?) -> UIView {
+    private func createPromotionView(promotion: [String: Any], isFeature: Bool) -> UIView {
         // Card container with Android-like design
         let cardContainer = UIView()
         cardContainer.backgroundColor = UIColor.systemBackground
@@ -735,11 +835,11 @@ class PromotionBottomSheetViewController: UIViewController {
             titleContainer.addArrangedSubview(paddingView)
         }
         
-        // Title text
+        // Title
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = UIFont.systemFont(ofSize: 16)
-        titleLabel.textColor = UIColor(red: 0.220, green: 0.255, blue: 0.318, alpha: 1.0) // #374151 gray-900
+        titleLabel.textColor = UIColor(red: 0.220, green: 0.255, blue: 0.318, alpha: 1.0)
         titleLabel.numberOfLines = 2
         titleLabel.lineBreakMode = .byWordWrapping
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -754,22 +854,23 @@ class PromotionBottomSheetViewController: UIViewController {
         bottomContainer.spacing = 8
         bottomContainer.translatesAutoresizingMaskIntoConstraints = false
         
-        // Extract cashback from reward text or title
+        // Extract cashback from promotion's own rewardText or description (like Android)
         var cashbackText = ""
-        if let reward = rewardText, !reward.isEmpty {
+        let promotionRewardText = promotion["rewardText"] as? String ?? promotion["description"] as? String ?? ""
+        if !promotionRewardText.isEmpty {
             let cashbackRegex = try! NSRegularExpression(pattern: "(\\d+% Cashback)")
-            let range = NSRange(location: 0, length: reward.count)
-            if let match = cashbackRegex.firstMatch(in: reward, range: range) {
-                cashbackText = String(reward[Range(match.range, in: reward)!])
+            let range = NSRange(location: 0, length: promotionRewardText.count)
+            if let match = cashbackRegex.firstMatch(in: promotionRewardText, range: range) {
+                cashbackText = String(promotionRewardText[Range(match.range, in: promotionRewardText)!])
             }
         }
         
-        // Cashback text
+        // Cashback
         if !cashbackText.isEmpty {
             let cashbackLabel = UILabel()
             cashbackLabel.text = cashbackText
-            cashbackLabel.font = UIFont.systemFont(ofSize: 14) // Larger than ends in (12), no bold
-            cashbackLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0B72AC
+            cashbackLabel.font = UIFont.systemFont(ofSize: 14)
+            cashbackLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0)
             bottomContainer.addArrangedSubview(cashbackLabel)
         }
         
@@ -805,11 +906,11 @@ class PromotionBottomSheetViewController: UIViewController {
             tagIcon.translatesAutoresizingMaskIntoConstraints = false
             buttonStack.addArrangedSubview(tagIcon)
             
-            // Add promo code text
+            // Promo code text
             let promoLabel = UILabel()
             promoLabel.text = promoCode
-            promoLabel.font = UIFont.systemFont(ofSize: 10) // Smaller font, no bold
-            promoLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0B72AC
+            promoLabel.font = UIFont.systemFont(ofSize: 10)
+            promoLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0)
             buttonStack.addArrangedSubview(promoLabel)
             
             promoButton.addSubview(buttonStack)
@@ -833,6 +934,7 @@ class PromotionBottomSheetViewController: UIViewController {
                 promoButton.addTarget(self, action: #selector(promoCodeTapped(_:)), for: .touchUpInside)
                 promoButton.tag = promotionId.hashValue
                 promotionIdMap[promotionId.hashValue] = promotionId
+                promotionDataMap[promotionId.hashValue] = promotion
             }
             
             bottomContainer.addArrangedSubview(promoButton)
@@ -869,6 +971,7 @@ class PromotionBottomSheetViewController: UIViewController {
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(cardTapped(_:)))
             cardContainer.tag = tag
             promotionIdMap[tag] = promotionId
+            promotionDataMap[tag] = promotion
             cardContainer.addGestureRecognizer(tapGesture)
             cardContainer.isUserInteractionEnabled = true
         }
@@ -896,6 +999,7 @@ class PromotionBottomSheetViewController: UIViewController {
         guard let view = gesture.view,
               let promotionId = promotionIdMap[view.tag] else { return }
         
+        // Just execute callback - no copy/toast here
         dismiss(animated: true) {
             self.onPromotionSelected?(promotionId)
         }
@@ -918,17 +1022,8 @@ class PromotionBottomSheetViewController: UIViewController {
     }
 
     @objc private func promoCodeTapped(_ sender: UIButton) {
-        guard let promotionId = promotionIdMap[sender.tag] else { return }
-        
-        // Get promo code from promotion data
-        let promoCode = getPromoCodeForPromotionId(promotionId)
-        guard let code = promoCode, !code.isEmpty else { return }
-        
-        // Copy to clipboard
-        UIPasteboard.general.string = code
-        
-        // Show simple toast message
-        showCopiedToast(promoCode: code)
+        // No action needed - copy/toast will happen later in browserDidInitialize
+        return
     }
     
     private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {
@@ -951,51 +1046,6 @@ class PromotionBottomSheetViewController: UIViewController {
         return nil
     }
     
-    private func showCopiedToast(promoCode: String) {
-        // Use system HUD - simple and reliable
-        DispatchQueue.main.async {
-            // Create a simple system-like HUD
-            guard let keyWindow = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) else { return }
-            
-            let hudView = UIView()
-            hudView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-            hudView.layer.cornerRadius = 8
-            hudView.translatesAutoresizingMaskIntoConstraints = false
-            
-            let label = UILabel()
-            label.text = "✓ \(promoCode) copied"
-            label.textColor = .white
-            label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-            label.textAlignment = .center
-            label.translatesAutoresizingMaskIntoConstraints = false
-            
-            hudView.addSubview(label)
-            keyWindow.addSubview(hudView)
-            
-            NSLayoutConstraint.activate([
-                hudView.centerXAnchor.constraint(equalTo: keyWindow.centerXAnchor),
-                hudView.centerYAnchor.constraint(equalTo: keyWindow.centerYAnchor),
-                label.topAnchor.constraint(equalTo: hudView.topAnchor, constant: 12),
-                label.bottomAnchor.constraint(equalTo: hudView.bottomAnchor, constant: -12),
-                label.leadingAnchor.constraint(equalTo: hudView.leadingAnchor, constant: 16),
-                label.trailingAnchor.constraint(equalTo: hudView.trailingAnchor, constant: -16)
-            ])
-            
-            // Animate and auto-dismiss
-            hudView.alpha = 0
-            UIView.animate(withDuration: 0.2, animations: {
-                hudView.alpha = 1
-            }) { _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    UIView.animate(withDuration: 0.2, animations: {
-                        hudView.alpha = 0
-                    }) { _ in
-                        hudView.removeFromSuperview()
-                    }
-                }
-            }
-        }
-    }
     
     private func createTagIcon() -> UIView {
         let iconView = UIView()
@@ -1004,7 +1054,7 @@ class PromotionBottomSheetViewController: UIViewController {
         let iconLayer = CAShapeLayer()
         let path = UIBezierPath()
         
-        // Create exact SVG path from HTML (scaled to 12x12)
+        // SVG path scaled to 12x12
         let scale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
         
         // Main tag shape path: M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
@@ -1031,7 +1081,7 @@ class PromotionBottomSheetViewController: UIViewController {
                      controlPoint2: CGPoint(x: 4.791 * scale, y: 3 * scale))
         path.close()
         
-        // Add the small dot: M7 7h.01
+        // Small dot
         let dotPath = UIBezierPath(ovalIn: CGRect(x: 7 * scale - 0.5, y: 7 * scale - 0.5, width: 1, height: 1))
         path.append(dotPath)
         
@@ -1098,6 +1148,88 @@ class PromotionBottomSheetViewController: UIViewController {
             return "ends in 1h"
         default:
             return "ends today"
+        }
+    }
+}
+
+// MARK: - PersistentToastManager
+class PersistentToastManager {
+    static let shared = PersistentToastManager()
+    
+    private var currentToastWindow: UIWindow?
+    
+    private init() {}
+    
+    func showToast(message: String, duration: TimeInterval) {
+        // Remove any existing toast
+        hideToast()
+        
+        // Create a new window that's above everything
+        let toastWindow = UIWindow(frame: UIScreen.main.bounds)
+        toastWindow.windowLevel = UIWindow.Level.alert + 1000 // Above everything
+        toastWindow.backgroundColor = UIColor.clear
+        toastWindow.isHidden = false
+        
+        // Create toast container
+        let toastContainer = UIView()
+        toastContainer.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        toastContainer.layer.cornerRadius = 12
+        toastContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Create label
+        let label = UILabel()
+        label.text = message
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Assemble views
+        toastContainer.addSubview(label)
+        toastWindow.addSubview(toastContainer)
+        
+        // Setup constraints - bottom right position (almost touching bottom)
+        NSLayoutConstraint.activate([
+            toastContainer.trailingAnchor.constraint(equalTo: toastWindow.trailingAnchor, constant: -20),
+            toastContainer.bottomAnchor.constraint(equalTo: toastWindow.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            toastContainer.leadingAnchor.constraint(greaterThanOrEqualTo: toastWindow.leadingAnchor, constant: 40),
+            
+            label.topAnchor.constraint(equalTo: toastContainer.topAnchor, constant: 16),
+            label.bottomAnchor.constraint(equalTo: toastContainer.bottomAnchor, constant: -16),
+            label.leadingAnchor.constraint(equalTo: toastContainer.leadingAnchor, constant: 20),
+            label.trailingAnchor.constraint(equalTo: toastContainer.trailingAnchor, constant: -20)
+        ])
+        
+        // Store reference
+        currentToastWindow = toastWindow
+        
+        // Animate in from right
+        toastContainer.alpha = 0
+        toastContainer.transform = CGAffineTransform(translationX: 100, y: 0)
+        
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: [], animations: {
+            toastContainer.alpha = 1
+            toastContainer.transform = .identity
+        }, completion: nil)
+        
+        // Auto-dismiss after duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            self.hideToast()
+        }
+    }
+    
+    func hideToast() {
+        guard let toastWindow = currentToastWindow,
+              let toastContainer = toastWindow.subviews.first else { return }
+        
+        // Animate out to right
+        UIView.animate(withDuration: 0.3, animations: {
+            toastContainer.alpha = 0
+            toastContainer.transform = CGAffineTransform(translationX: 100, y: 0)
+        }) { _ in
+            toastWindow.isHidden = true
+            self.currentToastWindow = nil
         }
     }
 }

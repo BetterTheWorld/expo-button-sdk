@@ -2,6 +2,8 @@ package expo.modules.buttonsdk
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -33,6 +35,11 @@ class PromotionManager(
     private var isBottomSheetOpen = false
     
     private var currentBrowser: BrowserInterface? = null
+    
+    companion object {
+        // Shared promo code state across all instances
+        private var sharedPendingPromoCode: String? = null
+    }
     
     fun setOnPromotionClickCallback(callback: (String, BrowserInterface?) -> Unit) {
         this.onPromotionClickCallback = callback
@@ -337,17 +344,35 @@ class PromotionManager(
                 onPromotionClick = { promotionId: String ->
                     isBottomSheetOpen = false
                     
-                    // Show global loader
+                    savePromoCodeForPromotion(promotionId)
+                    
+                    // Show appropriate loader based on whether promotion has promo code
                     val activity = context as? Activity
                     if (activity != null) {
-                        GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...")
-                        android.util.Log.d("PromotionManager", "🔄 Global loader shown")
+                        if (sharedPendingPromoCode != null && sharedPendingPromoCode!!.isNotEmpty()) {
+                            // For promotions with promo code, show copy loader with promo code pill
+                            GlobalLoaderManager.getInstance().showCopyLoader(activity, sharedPendingPromoCode!!)
+                            android.util.Log.d("PromotionManager", "🔄 Copy loader shown for promotion with code: $sharedPendingPromoCode")
+                        } else {
+                            // For promotions without promo code, show loader and hide after 3 seconds
+                            val promotionLoaderColor = Color.parseColor("#0B72AC") // Use the promotion blue color
+                            GlobalLoaderManager.getInstance().showLoader(activity, "Loading promotion...", promotionLoaderColor)
+                            android.util.Log.d("PromotionManager", "🔄 Generic loader shown for promotion without code")
+                            
+                            // Hide generic loader after exactly 3 seconds too
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                GlobalLoaderManager.getInstance().hideLoader()
+                                android.util.Log.d("PromotionManager", "🔄 Generic loader hidden after 2 seconds (forced)")
+                            }, 2000) // 2 seconds
+                        }
                     }
                     
-                    // Call the promotion click callback
-                    android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
-                    onPromotionClickCallback?.invoke(promotionId, currentBrowser)
-                    android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
+                    // Call the promotion click callback after 1 second delay
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
+                        onPromotionClickCallback?.invoke(promotionId, currentBrowser)
+                        android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
+                    }, 1000) // 1 second delay
                 },
                 onClose = {
                     isBottomSheetOpen = false
@@ -395,6 +420,132 @@ class PromotionManager(
         } catch (e: Exception) {
             false
         }
+    }
+    
+    private fun savePromoCodeForPromotion(promotionId: String) {
+        promotionData ?: run {
+            android.util.Log.d("PromotionManager", "🔄 No promotion data available")
+            return
+        }
+        
+        sharedPendingPromoCode = null
+        
+        // Check featured promotion first
+        val featuredPromotion = promotionData["featuredPromotion"] as? Map<String, Any>
+        if (featuredPromotion != null) {
+            val featuredId = featuredPromotion["id"] as? String
+            if (featuredId == promotionId) {
+                val promoCode = featuredPromotion["couponCode"] as? String ?: featuredPromotion["code"] as? String
+                if (!promoCode.isNullOrEmpty()) {
+                    sharedPendingPromoCode = promoCode
+                    android.util.Log.d("PromotionManager", "🔄 Saved promo code for featured promotion: $promoCode")
+                    return
+                }
+            }
+        }
+        
+        // Check regular promotions
+        val promotions = promotionData["promotions"] as? List<Map<String, Any>>
+        promotions?.forEach { promo ->
+            val id = promo["id"] as? String
+            if (id == promotionId) {
+                val promoCode = promo["couponCode"] as? String ?: promo["code"] as? String
+                if (!promoCode.isNullOrEmpty()) {
+                    sharedPendingPromoCode = promoCode
+                    android.util.Log.d("PromotionManager", "🔄 Saved promo code for promotion: $promoCode")
+                    return
+                }
+            }
+        }
+        
+        android.util.Log.d("PromotionManager", "🔄 No promo code found for promotion ID: $promotionId")
+    }
+    
+    fun showPendingPromoCodeToast() {
+        android.util.Log.d("PromotionManager", "🔄 showPendingPromoCodeToast called, sharedPendingPromoCode: ${sharedPendingPromoCode ?: "nil"}")
+        val promoCode = sharedPendingPromoCode
+        if (promoCode.isNullOrEmpty()) {
+            android.util.Log.d("PromotionManager", "🔄 No pending promo code to show")
+            return
+        }
+        
+        // Copy to clipboard immediately
+        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clipData = android.content.ClipData.newPlainText("Promo Code", promoCode)
+        clipboardManager.setPrimaryClip(clipData)
+        android.util.Log.d("PromotionManager", "🔄 Promo code copied: $promoCode")
+        
+        // Show toast immediately when Button SDK opens
+        val activity = context as? Activity
+        if (activity != null) {
+            activity.runOnUiThread {
+                showStyledToast(promoCode)
+                android.util.Log.d("PromotionManager", "🔄 Toast shown immediately when Button SDK opened")
+            }
+        }
+        
+        // Hide loader after exactly 3 seconds, no matter what
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            GlobalLoaderManager.getInstance().hideLoader()
+            android.util.Log.d("PromotionManager", "🔄 Loader hidden after 2 seconds (forced)")
+        }, 2000) // 2 seconds
+        
+        // Clear the pending code after showing
+        sharedPendingPromoCode = null
+    }
+    
+    private fun copyToClipboardAndShowToast(promoCode: String) {
+        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clipData = android.content.ClipData.newPlainText("Promo Code", promoCode)
+        clipboardManager.setPrimaryClip(clipData)
+        
+        val activity = context as? Activity
+        if (activity != null) {
+            activity.runOnUiThread {
+                showStyledToast(promoCode)
+            }
+        }
+    }
+    
+    private fun showStyledToast(promoCode: String) {
+        val layout = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(
+                (20 * context.resources.displayMetrics.density).toInt(),
+                (16 * context.resources.displayMetrics.density).toInt(),
+                (20 * context.resources.displayMetrics.density).toInt(),
+                (16 * context.resources.displayMetrics.density).toInt()
+            )
+            
+            val backgroundDrawable = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(android.graphics.Color.parseColor("#CC000000"))
+                cornerRadius = 12f * context.resources.displayMetrics.density
+            }
+            background = backgroundDrawable
+        }
+        
+        val textView = android.widget.TextView(context).apply {
+            text = "✓ $promoCode copied"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+        }
+        
+        layout.addView(textView)
+
+        val toast = android.widget.Toast(context).apply {
+            duration = android.widget.Toast.LENGTH_LONG
+            view = layout
+            
+            setGravity(
+                android.view.Gravity.BOTTOM or android.view.Gravity.RIGHT,
+                (20 * context.resources.displayMetrics.density).toInt(),
+                (60 * context.resources.displayMetrics.density).toInt()
+            )
+        }
+        toast.show()
     }
     
 }

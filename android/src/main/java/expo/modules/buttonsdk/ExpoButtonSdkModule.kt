@@ -129,6 +129,9 @@ class ExpoButtonSdkModule() : Module() {
       GlobalLoaderManager.getInstance().hideLoader()
       Log.d("CustomPurchasePathExtension", "🔄 Global loader hidden on browser initialization")
       
+      // Show pending promo code toast if available (no delay)
+      promotionManager?.showPendingPromoCodeToast()
+      
       with(browser.header) {
         title.text = options["headerTitle"] as? String ?: ""
         subtitle.text = options["headerSubtitle"] as? String ?: ""
