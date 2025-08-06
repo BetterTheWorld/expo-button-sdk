@@ -761,8 +761,8 @@ class PromotionBottomSheetViewController: UIViewController {
         let cardContainer = UIView()
         cardContainer.backgroundColor = UIColor.systemBackground
         cardContainer.layer.cornerRadius = 12
-        cardContainer.layer.borderWidth = 1
-        cardContainer.layer.borderColor = UIColor(red: 0.898, green: 0.906, blue: 0.922, alpha: 1.0).cgColor // #E5E7EB
+        cardContainer.layer.borderWidth = 2
+        cardContainer.layer.borderColor = UIColor(red: 0.898, green: 0.906, blue: 0.922, alpha: 1.0).cgColor
         cardContainer.translatesAutoresizingMaskIntoConstraints = false
         
         // Main container with margins
@@ -1022,8 +1022,12 @@ class PromotionBottomSheetViewController: UIViewController {
     }
 
     @objc private func promoCodeTapped(_ sender: UIButton) {
-        // No action needed - copy/toast will happen later in browserDidInitialize
-        return
+        // Trigger the same action as tapping the deal container
+        guard let promotionId = promotionIdMap[sender.tag] else { return }
+        
+        dismiss(animated: true) {
+            self.onPromotionSelected?(promotionId)
+        }
     }
     
     private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {

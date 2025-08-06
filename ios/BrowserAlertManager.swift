@@ -156,12 +156,12 @@ class ExitConfirmationModalViewController: UIViewController {
         
         let leaveButton = createButton(
             title: leaveButtonLabel,
-            backgroundColor: UIColor(red: 0.991, green: 0.937, blue: 0.937, alpha: 1.0),
-            textColor: UIColor(red: 0.796, green: 0.153, blue: 0.153, alpha: 1.0),
+            backgroundColor: UIColor.white,
+            textColor: UIColor(red: 0.404, green: 0.427, blue: 0.455, alpha: 1.0),
             action: #selector(leaveButtonTapped)
         )
         leaveButton.layer.borderWidth = 1
-        leaveButton.layer.borderColor = UIColor(red: 0.937, green: 0.835, blue: 0.835, alpha: 1.0).cgColor
+        leaveButton.layer.borderColor = UIColor(red: 0.827, green: 0.843, blue: 0.859, alpha: 1.0).cgColor
         
         // Add views to hierarchy
         view.addSubview(modalContainer)
@@ -199,7 +199,7 @@ class ExitConfirmationModalViewController: UIViewController {
             titleLabel.trailingAnchor.constraint(equalTo: titleSection.trailingAnchor),
             
             // Subtitle label
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 16),
             subtitleLabel.leadingAnchor.constraint(equalTo: titleSection.leadingAnchor),
             subtitleLabel.trailingAnchor.constraint(equalTo: titleSection.trailingAnchor),
             subtitleLabel.bottomAnchor.constraint(equalTo: titleSection.bottomAnchor),
@@ -209,7 +209,7 @@ class ExitConfirmationModalViewController: UIViewController {
             buttonContainer.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
             buttonContainer.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
             buttonContainer.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
-            buttonContainer.heightAnchor.constraint(equalToConstant: 44)
+            buttonContainer.heightAnchor.constraint(equalToConstant: 40)
         ])
         
         // Background tap gesture
