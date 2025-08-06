@@ -1022,8 +1022,12 @@ class PromotionBottomSheetViewController: UIViewController {
     }
 
     @objc private func promoCodeTapped(_ sender: UIButton) {
-        // No action needed - copy/toast will happen later in browserDidInitialize
-        return
+        // Trigger the same action as tapping the deal container
+        guard let promotionId = promotionIdMap[sender.tag] else { return }
+        
+        dismiss(animated: true) {
+            self.onPromotionSelected?(promotionId)
+        }
     }
     
     private func getPromoCodeForPromotionId(_ promotionId: String) -> String? {

@@ -372,9 +372,11 @@ class PromotionBottomSheet(
                                     .setDuration(100)
                                     .start()
                                 
-                                // Trigger click 
+                                // Trigger the same action as tapping the deal container
                                 android.util.Log.d("PromotionBottomSheet", "🎯 Promo code clicked for promotion: $id")
-                                handlePromoCodeCopy(id)
+                                dismissWithAnimation(rootView, container) {
+                                    onPromotionClick(id)
+                                }
                                 true // Consume the event
                             }
                             android.view.MotionEvent.ACTION_CANCEL -> {
