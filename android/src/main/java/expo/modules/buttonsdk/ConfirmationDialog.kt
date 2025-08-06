@@ -145,7 +145,7 @@ object ConfirmationDialog {
             setTextColor(Color.parseColor("#1C1C1C"))
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
-            val bottomMarginPx = (8 * density).toInt()
+            val bottomMarginPx = (16 * density).toInt()
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -232,34 +232,33 @@ object ConfirmationDialog {
         
         return Button(context).apply {
             this.text = text
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.DEFAULT
             
-            // Button styling
             val background = GradientDrawable().apply {
                 cornerRadius = 8 * density
                 if (isStayButton) {
-                    // Stay button
                     setColor(Color.parseColor("#074a7b"))
                 } else {
-                    // Leave button
-                    setColor(Color.parseColor("#FEF7F7"))
-                    setStroke((1 * density).toInt(), Color.parseColor("#F5D5D5"))
+                    setColor(Color.WHITE)
+                    setStroke((1 * density).toInt(), Color.parseColor("#D3D9E0"))
                 }
             }
             setBackground(background)
             
-            // Text color
             if (isStayButton) {
                 setTextColor(Color.WHITE)
             } else {
-                setTextColor(Color.parseColor("#CB2727"))
+                setTextColor(Color.parseColor("#677080"))
             }
             
-            // Padding
-            val verticalPaddingPx = (12 * density).toInt()
-            val horizontalPaddingPx = (16 * density).toInt()
+            val verticalPaddingPx = (2 * density).toInt()
+            val horizontalPaddingPx = (4 * density).toInt()
             setPadding(horizontalPaddingPx, verticalPaddingPx, horizontalPaddingPx, verticalPaddingPx)
+            
+            // Override minimum dimensions
+            minHeight = (36 * density).toInt()
+            minimumHeight = (36 * density).toInt()
             
             setOnClickListener { onClick() }
             
