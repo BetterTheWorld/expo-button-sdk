@@ -114,11 +114,10 @@ export function Example() {
               },
               exitConfirmation: {
                 enabled: true,
-                title: "Are you sure you want to leave?",
-                message:
-                  "You might miss out on exclusive offers and lose your progress.",
-                stayButtonLabel: "Stay",
-                leaveButtonLabel: "Leave",
+                title: "Leaving so soon?",
+                message: "If you exit now, you might miss your cashback.",
+                stayButtonLabel: "Keep shopping",
+                leaveButtonLabel: "Leave anyway",
               },
             });
           }}

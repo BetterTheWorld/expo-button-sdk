@@ -175,12 +175,13 @@ class ExitConfirmationModalViewController: UIViewController {
         
         // Setup constraints
         NSLayoutConstraint.activate([
-            // Modal container - centered in screen with max width
+            // Modal container - centered in screen with min 85% width
             modalContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             modalContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             modalContainer.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
             modalContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
-            modalContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
+            modalContainer.widthAnchor.constraint(greaterThanOrEqualTo: view.widthAnchor, multiplier: 0.85),
+            modalContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 500),
             
             // Content container padding
             contentContainer.topAnchor.constraint(equalTo: modalContainer.topAnchor, constant: 32),
