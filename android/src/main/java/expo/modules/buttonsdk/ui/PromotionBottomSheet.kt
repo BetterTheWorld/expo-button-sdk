@@ -112,8 +112,7 @@ class PromotionBottomSheet(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    // Card margins
-                    setMargins(16, 8, 16, 8)
+                    setMargins(16, 32, 16, 8)
                 }
             }
             
@@ -126,11 +125,10 @@ class PromotionBottomSheet(
                     (16 * context.resources.displayMetrics.density).toInt()
                 )
                 
-                // Clean card styling with subtle border and rounded corners
                 val drawable = android.graphics.drawable.GradientDrawable().apply {
                     setColor(Color.WHITE)
                     cornerRadius = 12f * context.resources.displayMetrics.density
-                    setStroke(1, Color.parseColor("#E5E7EB")) // Very subtle gray border
+                    setStroke(4, Color.parseColor("#E5E7EB"))
                 }
                 background = drawable
                 
