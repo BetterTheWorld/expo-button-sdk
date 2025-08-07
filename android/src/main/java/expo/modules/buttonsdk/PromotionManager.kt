@@ -50,12 +50,21 @@ class PromotionManager(
         
         val headerActions = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
         }
         
         val promotionCount = getPromotionCount()
         if (promotionCount > 0) {
             val promotionButton = createHeaderPromotionButton(promotionCount)
+            
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                rightMargin = dpToPx(4)
+            }
+            promotionButton.layoutParams = params
+            
             headerActions.addView(promotionButton)
         }
         
@@ -130,39 +139,12 @@ class PromotionManager(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 leftMargin = dpToPx(4)
-                rightMargin = if (count > 0) dpToPx(4) else 0
+                rightMargin = dpToPx(4)
+                gravity = Gravity.CENTER_VERTICAL
             }
             layoutParams = params
         }
-        button.addView(labelView)
-        
-        // Add count if there are promotions
-        if (count > 0) {
-            val countView = TextView(context).apply {
-                text = count.toString()
-                textSize = 11f
-                setTextColor(Color.parseColor("#0B72AC"))
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                
-                // Create circular background
-                val circleBackground = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(Color.parseColor("#E8F4F8"))
-                }
-                background = circleBackground
-                
-                // Set size and padding for circle
-                val circleSize = dpToPx(16)
-                setPadding(dpToPx(4), dpToPx(1), dpToPx(4), dpToPx(1))
-                minWidth = circleSize
-                minHeight = circleSize
-                gravity = Gravity.CENTER
-                
-                val params = LinearLayout.LayoutParams(circleSize, circleSize)
-                layoutParams = params
-            }
-            button.addView(countView)
-        }
+        button.addView(labelView)        
         
         return button
     }
