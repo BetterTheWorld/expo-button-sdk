@@ -30,7 +30,8 @@ class PromotionManager(
     private val promotionData: Map<String, Any>?,
     private var onPromotionClickCallback: ((String, BrowserInterface?) -> Unit)?,
     private val badgeLabel: String = "Offers",
-    private val listTitle: String = "Available Promotions"
+    private val listTitle: String = "Available Promotions",
+    private val badgeFontSize: Float = 11f
 ) {
     private var isBottomSheetOpen = false
     
@@ -130,7 +131,7 @@ class PromotionManager(
         // Add label
         val labelView = TextView(context).apply {
             text = badgeLabel
-            textSize = 11f
+            textSize = badgeFontSize
             setTextColor(Color.parseColor("#0B72AC"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             
@@ -150,13 +151,17 @@ class PromotionManager(
     }
     
     private fun createTagIconView(): View {
+        // Calculate scale factor based on font size (default is 11f)
+        val scaleFactor = badgeFontSize / 11f
+        val scaledIconSize = dpToPx((14 * scaleFactor).toInt())
+        
         val iconView = ImageView(context).apply {
             setImageDrawable(createTagIconDrawable())
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
             val params = LinearLayout.LayoutParams(
-                dpToPx(14),
-                dpToPx(14)
+                scaledIconSize,
+                scaledIconSize
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
@@ -167,10 +172,13 @@ class PromotionManager(
     
     private fun createTagIconDrawable(): Drawable {
         return object : Drawable() {
+            // Calculate scale factor for stroke width
+            val scaleFactor = badgeFontSize / 11f
+            
             private val paint = Paint().apply {
                 color = Color.parseColor("#0B72AC")
                 style = Paint.Style.STROKE
-                strokeWidth = dpToPx(1).toFloat() // Thinner stroke
+                strokeWidth = dpToPx(1).toFloat() * scaleFactor // Scale stroke width
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
                 isAntiAlias = true

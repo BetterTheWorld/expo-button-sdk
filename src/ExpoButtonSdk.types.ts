@@ -40,6 +40,7 @@ export interface StartPurchasePathOptions {
   closeOnPromotionClick?: boolean; // Default: true - whether to close current instance when promotion is clicked
   promotionBadgeLabel?: string; // Label for the promotion badge (e.g., "Offers", "Deals")
   promotionListTitle?: string; // Title for the promotion list modal (e.g., "Promotions", "Available Offers")
+  promotionBadgeFontSize?: number; // Font size for the promotion badge text (e.g., 11, 12, 13)
 }
 
 export type Identifier = string;

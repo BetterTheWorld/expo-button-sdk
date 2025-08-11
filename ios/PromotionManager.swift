@@ -10,6 +10,7 @@ class PromotionManager: NSObject {
     private weak var currentBrowser: BrowserInterface?
     private var badgeLabel: String
     private var listTitle: String
+    private var badgeFontSize: CGFloat
     private var badgeView: UIView?
     private var isButtonHidden: Bool = false
     private weak var webView: WKWebView?
@@ -19,11 +20,12 @@ class PromotionManager: NSObject {
     private static var sharedPendingPromoCode: String?
     private static var copiedPromoCode: String?
     
-    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil) {
+    init(promotionData: NSDictionary?, onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?, badgeLabel: String? = nil, listTitle: String? = nil, badgeFontSize: CGFloat = 11.0) {
         self.promotionData = promotionData
         self.onPromotionClickCallback = onPromotionClickCallback
         self.badgeLabel = badgeLabel ?? "Offers"
         self.listTitle = listTitle ?? "Promotions"
+        self.badgeFontSize = badgeFontSize
         super.init()
     }
     
@@ -76,13 +78,17 @@ class PromotionManager: NSObject {
         containerView.layer.cornerRadius = 13
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
+        // Calculate scale factor based on font size (default is 11.0)
+        let scaleFactor = self.badgeFontSize / 11.0
+        let scaledIconSize = 12.0 * scaleFactor
+        
         // Icon and text stack
-        let iconView = createTagIcon()
+        let iconView = createTagIcon(fontScale: scaleFactor)
         iconView.translatesAutoresizingMaskIntoConstraints = false
         
         let titleLabel = UILabel()
         titleLabel.text = self.badgeLabel
-        titleLabel.font = UIFont.systemFont(ofSize: 11)
+        titleLabel.font = UIFont.systemFont(ofSize: self.badgeFontSize)
         titleLabel.textColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0) // #0b72ac
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
@@ -92,8 +98,8 @@ class PromotionManager: NSObject {
         NSLayoutConstraint.activate([
             iconView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 6),
             iconView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 12),
-            iconView.heightAnchor.constraint(equalToConstant: 12),
+            iconView.widthAnchor.constraint(equalToConstant: scaledIconSize),
+            iconView.heightAnchor.constraint(equalToConstant: scaledIconSize),
             
             titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 3),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -6),
@@ -108,15 +114,16 @@ class PromotionManager: NSObject {
         return containerView
     }
     
-    private func createTagIcon() -> UIView {
+    private func createTagIcon(fontScale: CGFloat = 1.0) -> UIView {
         let iconView = UIView()
         iconView.backgroundColor = UIColor.clear
         
         let iconLayer = CAShapeLayer()
         let path = UIBezierPath()
         
-        // SVG path scaled to 12x12
-        let scale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
+        // SVG path scaled to 12x12, then scaled by font size
+        let baseScale: CGFloat = 12.0 / 24.0 // Scale from 24x24 to 12x12
+        let scale: CGFloat = baseScale * fontScale
         
         // Main tag shape path: M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z
         path.move(to: CGPoint(x: 7 * scale, y: 3 * scale))
@@ -149,7 +156,7 @@ class PromotionManager: NSObject {
         iconLayer.path = path.cgPath
         iconLayer.fillColor = UIColor.clear.cgColor
         iconLayer.strokeColor = UIColor(red: 0.043, green: 0.447, blue: 0.675, alpha: 1.0).cgColor // #0b72ac
-        iconLayer.lineWidth = 2.0 * scale
+        iconLayer.lineWidth = 2.0 * baseScale * fontScale // Scale stroke width with font
         iconLayer.lineCap = .round
         iconLayer.lineJoin = .round
         
