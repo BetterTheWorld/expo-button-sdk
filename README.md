@@ -84,7 +84,8 @@ startPurchasePath({
   footerBackgroundColor: "#FFFFFF",
   footerTintColor:       "#FFFFFF",
   promotionBadgeLabel:   "Deals", // optional: customize promotion badge label
-  promotionListTitle:    "Available Deals" // optional: customize promotion list title
+  promotionListTitle:    "Available Deals", // optional: customize promotion list title
+  promotionBadgeFontSize: 12 // optional: customize promotion badge font size (default: 11)
 });
 
 // On user login
@@ -148,6 +149,7 @@ startPurchasePath({
   closeOnPromotionClick: true, // Default: true - closes current instance when promotion is clicked
   promotionBadgeLabel: "Deals", // Customize badge label (default: "Offers")
   promotionListTitle: "Available Deals", // Customize list title (default: "Promotions")
+  promotionBadgeFontSize: 13, // Customize badge font size (default: 11)
   onPromotionClick: async (promotionId: string) => {
     console.log('Promotion clicked:', promotionId);
     
@@ -210,6 +212,9 @@ startPurchasePath({
   // Customize the list title (appears in promotion modal)
   promotionListTitle: "Promos!", // Default: "Promotions" (iOS) or "Available Promotions" (Android)
   
+  // Customize the badge font size (affects both text and icon scaling)
+  promotionBadgeFontSize: 12, // Default: 11, affects badge text size and icon scaling
+  
   onPromotionClick: async (promotionId: string) => {
     // Handle promotion selection
     return { url: newUrl, token: newToken };
@@ -218,6 +223,30 @@ startPurchasePath({
 ```
 
 **Supported Languages**: These labels can be customized for any language or branding needs.
+
+### Badge Font Size Customization
+
+The `promotionBadgeFontSize` prop allows you to customize the size of the promotion badge text and automatically scales the icon proportionally:
+
+```typescript
+startPurchasePath({
+  url: "https://the.button.url",
+  token: "my-tracking-token",
+  promotionData: promotionData,
+  
+  // Font size examples:
+  promotionBadgeFontSize: 10,  // Smaller badge (icon scales to ~10.9px)
+  promotionBadgeFontSize: 11,  // Default size (icon 12px on iOS, 14dp on Android)
+  promotionBadgeFontSize: 13,  // Larger badge (icon scales to ~14.2px)
+  promotionBadgeFontSize: 15,  // Extra large (icon scales to ~16.4px)
+});
+```
+
+**Scaling Behavior:**
+- **Text**: Direct font size control (e.g., 11pt, 13pt, 15pt)
+- **Icon**: Automatically scales proportionally (scale factor = fontSize / 11)
+- **Stroke Width**: Icon stroke thickness also scales to maintain visual consistency
+- **Cross-platform**: Consistent scaling behavior on both iOS and Android
 
 # Contributing
 

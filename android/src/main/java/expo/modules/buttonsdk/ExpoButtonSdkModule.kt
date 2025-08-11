@@ -84,6 +84,7 @@ class ExpoButtonSdkModule() : Module() {
     // Promotion labels
     private val promotionBadgeLabel: String
     private val promotionListTitle: String
+    private val promotionBadgeFontSize: Float
     
     // Promotion manager
     private var promotionManager: PromotionManager? = null
@@ -103,6 +104,7 @@ class ExpoButtonSdkModule() : Module() {
       // Parse promotion label options
       promotionBadgeLabel = options["promotionBadgeLabel"] as? String ?: "Offers"
       promotionListTitle = options["promotionListTitle"] as? String ?: "Available Promotions"
+      promotionBadgeFontSize = (options["promotionBadgeFontSize"] as? Number)?.toFloat() ?: 11f
       
       // Initialize promotion manager if promotion data is provided
       val promotionData = options["promotionData"] as? Map<String, Any>
@@ -120,7 +122,7 @@ class ExpoButtonSdkModule() : Module() {
             // Hide loader since we're not navigating to a new promotion
             GlobalLoaderManager.getInstance().hideLoader()
           }
-        }, promotionBadgeLabel, promotionListTitle)
+        }, promotionBadgeLabel, promotionListTitle, promotionBadgeFontSize)
       }
     }
 

@@ -23,6 +23,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     // Promotion labels
     var promotionBadgeLabel: String?
     var promotionListTitle: String?
+    var promotionBadgeFontSize: CGFloat = 11.0
     
     init(options: NSDictionary) {
         super.init()
@@ -52,6 +53,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         // Parse promotion label options
         self.promotionBadgeLabel = options["promotionBadgeLabel"] as? String
         self.promotionListTitle = options["promotionListTitle"] as? String
+        self.promotionBadgeFontSize = options["promotionBadgeFontSize"] as? CGFloat ?? 11.0
         
         // Initialize promotion manager if promotion data is provided
         if let promotionData = options["promotionData"] as? NSDictionary {
@@ -59,7 +61,8 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
                 promotionData: promotionData, 
                 onPromotionClickCallback: { _, _ in },
                 badgeLabel: self.promotionBadgeLabel,
-                listTitle: self.promotionListTitle
+                listTitle: self.promotionListTitle,
+                badgeFontSize: self.promotionBadgeFontSize
             )
         }
     }
