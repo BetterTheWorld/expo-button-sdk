@@ -694,12 +694,13 @@ class PromotionBottomSheetViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = UIColor.systemBackground
+        view.backgroundColor = UIColor.white
         
         // Add title
         let titleLabel = UILabel()
         titleLabel.text = listTitle
         titleLabel.font = UIFont.boldSystemFont(ofSize: 18)
+        titleLabel.textColor = UIColor.black
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
@@ -766,7 +767,7 @@ class PromotionBottomSheetViewController: UIViewController {
     private func createPromotionView(promotion: [String: Any], isFeature: Bool) -> UIView {
         // Card container with Android-like design
         let cardContainer = UIView()
-        cardContainer.backgroundColor = UIColor.systemBackground
+        cardContainer.backgroundColor = UIColor.white
         cardContainer.layer.cornerRadius = 12
         cardContainer.layer.borderWidth = 2
         cardContainer.layer.borderColor = UIColor(red: 0.898, green: 0.906, blue: 0.922, alpha: 1.0).cgColor
