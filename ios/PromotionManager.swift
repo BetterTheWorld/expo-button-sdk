@@ -16,6 +16,7 @@ class PromotionManager: NSObject {
     private weak var webView: WKWebView?
     private var displayLink: CADisplayLink?
     
+    
     // Shared promo code state across all instances
     private static var sharedPendingPromoCode: String?
     private static var copiedPromoCode: String?
@@ -299,35 +300,34 @@ class PromotionManager: NSObject {
     
     /// Check if the button is in the notch area (where system icons are)
     private func isButtonInNotchArea(buttonFrame: CGRect, safeAreaInsets: UIEdgeInsets) -> Bool {
-        guard let window = UIApplication.shared.windows.first else { 
+        guard let window = UIApplication.shared.windows.first else {
             print("🔍 No window found")
-            return false 
+            return false
         }
         
-        let screenBounds = window.bounds
         let statusBarHeight = safeAreaInsets.top
+        let hasNotch = statusBarHeight > 24
         
-        // Get the actual notch/status bar height
-        let notchHeight = max(statusBarHeight, 44) // At least 44px for status bar
         
-        // The notch area is the entire top area where system icons live
-        let notchArea = CGRect(
-            x: 0,
-            y: 0,
-            width: screenBounds.width,
-            height: notchHeight
-        )
+        // CRITICAL: Check if button is actually visible on screen
+        // If button's Y position is negative or very small, it means it scrolled out of view
+        let isButtonOffScreen = buttonFrame.minY < -10  // Button has scrolled up and out of view
         
-        // Check if button overlaps with notch area
-        let isInNotchArea = buttonFrame.intersects(notchArea)
+        if isButtonOffScreen {
+            return true  // Hide button when it's scrolled out of view
+        }
         
-        // ALSO check if button is in the top portion of the screen (simplified check)
-        let isInTopArea = buttonFrame.minY < notchHeight
+        // For devices WITH notch: also check if button intersects with notch area
+        if hasNotch {
+            let notchHeight = statusBarHeight
+            let notchArea = CGRect(x: 0, y: 0, width: window.bounds.width, height: notchHeight)
+            let isInNotchArea = buttonFrame.intersects(notchArea)
+            
+            return isInNotchArea
+        }
         
-        // Hide if button is in the notch area OR top area
-        let shouldHide = isInNotchArea || isInTopArea
-        
-        return shouldHide
+        // Device without notch and button is on screen - show it
+        return false
     }
     
     /// Force check position now (for testing)
