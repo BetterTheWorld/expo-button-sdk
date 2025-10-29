@@ -50,7 +50,10 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     );
   }
 
-  return await ExpoButtonSdkModule.startPurchasePath(sanitizedOptions);
+  // Remove non-serializable properties before passing to native module
+  const { onPromotionClick, ...nativeOptions } = sanitizedOptions;
+
+  return await ExpoButtonSdkModule.startPurchasePath(nativeOptions);
 }
 
 export function clearAllData() {
