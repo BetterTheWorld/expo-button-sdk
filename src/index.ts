@@ -38,9 +38,8 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
           // based on closeOnPromotionClick setting
 
           // Start new purchase path
-          const { onPromotionClick: _, ...filteredOptions } = options;
           await startPurchasePath({
-            ...filteredOptions,
+            ...options,
             url: result.url,
             token: result.token,
           });
