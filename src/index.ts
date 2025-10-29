@@ -38,8 +38,9 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
           // based on closeOnPromotionClick setting
 
           // Start new purchase path
+          const { onPromotionClick: _, ...filteredOptions } = options;
           await startPurchasePath({
-            ...options,
+            ...filteredOptions,
             url: result.url,
             token: result.token,
           });
@@ -50,7 +51,10 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     );
   }
 
-  return await ExpoButtonSdkModule.startPurchasePath(sanitizedOptions);
+  // Remove non-serializable properties before passing to native module
+  const { onPromotionClick, ...nativeOptions } = sanitizedOptions;
+
+  return await ExpoButtonSdkModule.startPurchasePath(nativeOptions);
 }
 
 export function clearAllData() {
