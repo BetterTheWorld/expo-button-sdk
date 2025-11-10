@@ -42,4 +42,23 @@ class ButtonSdkActivityLifecycleListener(activityContext: Context) : ReactActivi
         }
         return null
     }
+
+    override fun onDestroy(activity: Activity) {
+        // Clean up any global state when activity is destroyed
+        try {
+            GlobalLoaderManager.getInstance().hideLoader()
+            Log.d("ButtonSdkActivityLifecycleListener", "Activity destroyed, cleaned up global state")
+        } catch (e: Exception) {
+            Log.e("ButtonSdkActivityLifecycleListener", "Error cleaning up on activity destroy", e)
+        }
+    }
+
+    override fun onPause(activity: Activity) {
+        // Hide loader when activity is paused to prevent stale loaders
+        try {
+            GlobalLoaderManager.getInstance().hideLoader()
+        } catch (e: Exception) {
+            Log.e("ButtonSdkActivityLifecycleListener", "Error hiding loader on pause", e)
+        }
+    }
 }
