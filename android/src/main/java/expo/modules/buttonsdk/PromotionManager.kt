@@ -24,18 +24,21 @@ import expo.modules.buttonsdk.ui.PromotionBottomSheet
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.lang.ref.WeakReference
 
 class PromotionManager(
-    private val context: Context,
+    context: Context,
     private val promotionData: Map<String, Any>?,
     private var onPromotionClickCallback: ((String, BrowserInterface?) -> Unit)?,
     private val badgeLabel: String = "Offers",
     private val listTitle: String = "Available Promotions",
     private val badgeFontSize: Float = 11f
 ) {
+    // Use WeakReference to prevent memory leaks
+    private val contextRef = WeakReference(context)
     private var isBottomSheetOpen = false
     
-    private var currentBrowser: BrowserInterface? = null
+    private var currentBrowserRef: WeakReference<BrowserInterface>? = null
     
     companion object {
         // Shared promo code state across all instances
@@ -47,7 +50,8 @@ class PromotionManager(
     }
     
     fun setupPromotionsBadge(browser: BrowserInterface) {
-        currentBrowser = browser
+        currentBrowserRef = WeakReference(browser)
+        val context = contextRef.get() ?: return
         
         val headerActions = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -58,15 +62,17 @@ class PromotionManager(
         if (promotionCount > 0) {
             val promotionButton = createHeaderPromotionButton(promotionCount)
             
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                rightMargin = dpToPx(4)
+            if (promotionButton != null) {
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    rightMargin = dpToPx(4)
+                }
+                promotionButton.layoutParams = params
+                
+                headerActions.addView(promotionButton)
             }
-            promotionButton.layoutParams = params
-            
-            headerActions.addView(promotionButton)
         }
         
         try {
@@ -92,7 +98,8 @@ class PromotionManager(
         return (dp * Resources.getSystem().displayMetrics.density).toInt()
     }
     
-    private fun createHeaderPromotionButton(count: Int): View {
+    private fun createHeaderPromotionButton(count: Int): View? {
+        val context = contextRef.get() ?: return null
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -126,7 +133,9 @@ class PromotionManager(
         
         // Add tag icon
         val iconView = createTagIconView()
-        button.addView(iconView)
+        if (iconView != null) {
+            button.addView(iconView)
+        }
         
         // Add label
         val labelView = TextView(context).apply {
@@ -150,7 +159,8 @@ class PromotionManager(
         return button
     }
     
-    private fun createTagIconView(): View {
+    private fun createTagIconView(): View? {
+        val context = contextRef.get() ?: return null
         // Calculate scale factor based on font size (default is 11f)
         val scaleFactor = badgeFontSize / 11f
         val scaledIconSize = dpToPx((14 * scaleFactor).toInt())
@@ -250,7 +260,8 @@ class PromotionManager(
     
     private fun showPromotionsList() {
         promotionData ?: return
-        currentBrowser ?: return
+        val currentBrowser = currentBrowserRef?.get() ?: return
+        val context = contextRef.get() ?: return
         
         val merchantName = promotionData["merchantName"] as? String ?: "Store"
         val rewardText = promotionData["rewardText"] as? String
@@ -316,8 +327,9 @@ class PromotionManager(
             return
         }
 
-        val browser = currentBrowser ?: return
+        val browser = currentBrowserRef?.get() ?: return
         val container = browser.viewContainer
+        val context = contextRef.get() ?: return
         
         if (container == null) {
             android.util.Log.e("PromotionManager", "Could not get view container from browser")
@@ -360,7 +372,7 @@ class PromotionManager(
                     // Call the promotion click callback after 1 second delay
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         android.util.Log.d("PromotionManager", "📤 Invoking promotion callback for: $promotionId")
-                        onPromotionClickCallback?.invoke(promotionId, currentBrowser)
+                        onPromotionClickCallback?.invoke(promotionId, currentBrowserRef?.get())
                         android.util.Log.d("PromotionManager", "✅ Promotion callback completed")
                     }, 1000) // 1 second delay
                 },
@@ -459,6 +471,8 @@ class PromotionManager(
             return
         }
         
+        val context = contextRef.get() ?: return
+        
         // Copy to clipboard immediately
         val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clipData = android.content.ClipData.newPlainText("Promo Code", promoCode)
@@ -485,6 +499,7 @@ class PromotionManager(
     }
     
     private fun copyToClipboardAndShowToast(promoCode: String) {
+        val context = contextRef.get() ?: return
         val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clipData = android.content.ClipData.newPlainText("Promo Code", promoCode)
         clipboardManager.setPrimaryClip(clipData)
@@ -498,6 +513,7 @@ class PromotionManager(
     }
     
     private fun showStyledToast(promoCode: String) {
+        val context = contextRef.get() ?: return
         val layout = android.widget.LinearLayout(context).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setPadding(
@@ -538,4 +554,14 @@ class PromotionManager(
         toast.show()
     }
     
+    // Clean up method to prevent memory leaks
+    fun cleanup() {
+        try {
+            onPromotionClickCallback = null
+            currentBrowserRef = null
+            android.util.Log.d("PromotionManager", "PromotionManager cleaned up")
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionManager", "Error during cleanup", e)
+        }
+    }
 }

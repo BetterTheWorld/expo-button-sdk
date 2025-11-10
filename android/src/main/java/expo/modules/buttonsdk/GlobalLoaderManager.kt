@@ -10,6 +10,9 @@ import android.widget.FrameLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.LinearLayout
+import android.os.Handler
+import android.os.Looper
+import java.lang.ref.WeakReference
 
 class GlobalLoaderManager private constructor() {
     
@@ -24,14 +27,24 @@ class GlobalLoaderManager private constructor() {
         }
     }
     
+    @Volatile
     private var currentLoaderView: View? = null
-    private var currentActivity: Activity? = null
+    @Volatile
+    private var currentActivityRef: WeakReference<Activity>? = null
     
     fun showLoader(activity: Activity, message: String = "Loading promotion...", loaderColor: Int? = null) {
+        // Ensure we're on the main thread
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Handler(Looper.getMainLooper()).post {
+                showLoader(activity, message, loaderColor)
+            }
+            return
+        }
+        
         try {
             hideLoader() // Remove any existing loader first
             
-            currentActivity = activity
+            currentActivityRef = WeakReference(activity)
             
             // Get the root view of the activity (this will be above everything including WebView)
             val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
@@ -39,7 +52,7 @@ class GlobalLoaderManager private constructor() {
             val loaderOverlay = createLoaderView(activity, message, loaderColor)
             currentLoaderView = loaderOverlay
             
-            rootView.addView(loaderOverlay)
+            rootView?.addView(loaderOverlay)
             
             android.util.Log.d("GlobalLoaderManager", "✅ Loader shown over root view")
             
@@ -49,10 +62,18 @@ class GlobalLoaderManager private constructor() {
     }
     
     fun showCopyLoader(activity: Activity, promoCode: String) {
+        // Ensure we're on the main thread
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Handler(Looper.getMainLooper()).post {
+                showCopyLoader(activity, promoCode)
+            }
+            return
+        }
+        
         try {
             hideLoader() // Remove any existing loader first
             
-            currentActivity = activity
+            currentActivityRef = WeakReference(activity)
             
             // Get the root view of the activity (this will be above everything including WebView)
             val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
@@ -60,7 +81,7 @@ class GlobalLoaderManager private constructor() {
             val loaderOverlay = createCopyLoaderView(activity, promoCode)
             currentLoaderView = loaderOverlay
             
-            rootView.addView(loaderOverlay)
+            rootView?.addView(loaderOverlay)
             
             android.util.Log.d("GlobalLoaderManager", "✅ Copy loader shown with promo code: $promoCode")
             
@@ -70,15 +91,24 @@ class GlobalLoaderManager private constructor() {
     }
     
     fun hideLoader() {
+        // Ensure we're on the main thread
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Handler(Looper.getMainLooper()).post {
+                hideLoader()
+            }
+            return
+        }
+        
         try {
             currentLoaderView?.let { loader ->
-                currentActivity?.let { activity ->
+                currentActivityRef?.get()?.let { activity ->
                     val rootView = activity.findViewById<ViewGroup>(android.R.id.content)
-                    rootView.removeView(loader)
+                    rootView?.removeView(loader)
                     android.util.Log.d("GlobalLoaderManager", "✅ Loader hidden")
                 }
             }
             currentLoaderView = null
+            currentActivityRef = null
         } catch (e: Exception) {
             android.util.Log.e("GlobalLoaderManager", "❌ Error hiding loader", e)
         }

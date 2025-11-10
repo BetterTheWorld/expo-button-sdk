@@ -9,6 +9,8 @@ import android.util.Log
 import android.graphics.Color
 import com.usebutton.sdk.Button
 import com.usebutton.sdk.purchasepath.*
+import java.lang.ref.WeakReference
+import android.webkit.URLUtil
 
 class ExpoButtonSdkModule() : Module() {
 
@@ -35,6 +37,17 @@ class ExpoButtonSdkModule() : Module() {
       val url = params["url"] as? String ?: ""
       val token = params["token"] as? String
 
+      // URL validation with backwards compatibility
+      if (url.isBlank()) {
+        promise.reject("INVALID_URL", "URL cannot be blank", null)
+        return@AsyncFunction
+      }
+
+      // Validate URL format but allow edge cases for backwards compatibility
+      if (!isValidUrlSafe(url)) {
+        Log.w("ButtonSdk", "URL might be invalid but proceeding for backwards compatibility: $url")
+      }
+
       val request = PurchasePathRequest(url).apply {
         token?.let {
           Log.d("ButtonSdk", "startPurchasePath, token: $it")
@@ -48,10 +61,14 @@ class ExpoButtonSdkModule() : Module() {
             val activity = appContext.activityProvider?.currentActivity
             if (activity != null) {
               Button.purchasePath().extension = CustomPurchasePathExtension(activity, params) { promotionId ->
-                val eventBody = Bundle().apply {
-                  putString("promotionId", promotionId)
+                try {
+                  val eventBody = Bundle().apply {
+                    putString("promotionId", promotionId)
+                  }
+                  sendEvent("onPromotionClick", eventBody)
+                } catch (e: Exception) {
+                  Log.e("ButtonSdk", "Error sending promotion click event", e)
                 }
-                sendEvent("onPromotionClick", eventBody)
               }
               purchasePath.start(activity)
             } else {
@@ -68,10 +85,13 @@ class ExpoButtonSdkModule() : Module() {
   }
 
   class CustomPurchasePathExtension(
-    private val activity: Activity,
+    activity: Activity,
     private val options: Map<String, Any>,
     private val onPromotionClick: (String) -> Unit
   ) : PurchasePathExtension {
+
+    // Use WeakReference to prevent memory leaks
+    private val activityRef = WeakReference(activity)
 
     // Exit confirmation configuration
     private val exitConfirmationEnabled: Boolean
@@ -109,20 +129,23 @@ class ExpoButtonSdkModule() : Module() {
       // Initialize promotion manager if promotion data is provided
       val promotionData = options["promotionData"] as? Map<String, Any>
       if (promotionData != null) {
-        promotionManager = PromotionManager(activity, promotionData, { promotionId, browser ->
-          Log.d("CustomPurchasePathExtension", "🎯 Received promotion click: $promotionId")
-          onPromotionClick(promotionId)
-          Log.d("CustomPurchasePathExtension", "📤 Sent promotion event to TypeScript")
-          
-          if (closeOnPromotionClick) {
-            Log.d("CustomPurchasePathExtension", "🚪 Closing browser (closeOnPromotionClick=true)")
-            browser?.dismiss()
-          } else {
-            Log.d("CustomPurchasePathExtension", "🔄 Browser stays open (closeOnPromotionClick=false)")
-            // Hide loader since we're not navigating to a new promotion
-            GlobalLoaderManager.getInstance().hideLoader()
-          }
-        }, promotionBadgeLabel, promotionListTitle, promotionBadgeFontSize)
+        val currentActivity = activityRef.get()
+        if (currentActivity != null) {
+          promotionManager = PromotionManager(currentActivity, promotionData, { promotionId, browser ->
+            Log.d("CustomPurchasePathExtension", "🎯 Received promotion click: $promotionId")
+            onPromotionClick(promotionId)
+            Log.d("CustomPurchasePathExtension", "📤 Sent promotion event to TypeScript")
+            
+            if (closeOnPromotionClick) {
+              Log.d("CustomPurchasePathExtension", "🚪 Closing browser (closeOnPromotionClick=true)")
+              browser?.dismiss()
+            } else {
+              Log.d("CustomPurchasePathExtension", "🔄 Browser stays open (closeOnPromotionClick=false)")
+              // Hide loader since we're not navigating to a new promotion
+              GlobalLoaderManager.getInstance().hideLoader()
+            }
+          }, promotionBadgeLabel, promotionListTitle, promotionBadgeFontSize)
+        }
       }
     }
 
@@ -176,19 +199,52 @@ class ExpoButtonSdkModule() : Module() {
       Log.d("CustomPurchasePathExtension", "onShouldClose called, exitConfirmationEnabled: $exitConfirmationEnabled")
       
       if (exitConfirmationEnabled) {
-        ConfirmationDialog.show(
-          activity,
-          exitConfirmationTitle,
-          exitConfirmationMessage,
-          stayButtonLabel,
-          leaveButtonLabel,
-          browserInterface
-        )
-        return false // Prevent automatic closure
+        val currentActivity = activityRef.get()
+        if (currentActivity != null) {
+          ConfirmationDialog.show(
+            currentActivity,
+            exitConfirmationTitle,
+            exitConfirmationMessage,
+            stayButtonLabel,
+            leaveButtonLabel,
+            browserInterface
+          )
+          return false // Prevent automatic closure
+        }
       }
       return true // Allow closure
     }
 
-    override fun onClosed() {}
+    override fun onClosed() {
+      // Clean up references to prevent memory leaks
+      try {
+        Log.d("CustomPurchasePathExtension", "Cleaning up resources")
+        promotionManager?.cleanup()
+        promotionManager = null
+        GlobalLoaderManager.getInstance().hideLoader()
+      } catch (e: Exception) {
+        Log.e("CustomPurchasePathExtension", "Error during cleanup", e)
+      }
+    }
+  }
+
+  // Safe URL validation function
+  private fun isValidUrlSafe(url: String): Boolean {
+    return try {
+      // Basic URL validation that allows for edge cases
+      when {
+        url.isBlank() -> false
+        url.startsWith("http://") || url.startsWith("https://") -> {
+          // Use URLUtil for more permissive validation
+          URLUtil.isValidUrl(url)
+        }
+        // Allow custom schemes for backwards compatibility
+        url.contains("://") -> true
+        else -> false
+      }
+    } catch (e: Exception) {
+      Log.w("ButtonSdk", "URL validation failed, allowing for backwards compatibility", e)
+      true // Be permissive for backwards compatibility
+    }
   }
 }
