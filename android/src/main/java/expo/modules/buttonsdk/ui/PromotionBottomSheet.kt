@@ -611,7 +611,7 @@ class PromotionBottomSheet(
     }
     
     private fun calculateTimeRemaining(endsAt: String?): String? {
-        if (endsAt == null) return null
+        if (endsAt.isNullOrBlank()) return null
         
         return try {
             // Handle the format from your data: "2025-07-21T03:59:00Z"
