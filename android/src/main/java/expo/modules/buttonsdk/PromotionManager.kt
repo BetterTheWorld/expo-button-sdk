@@ -558,7 +558,7 @@ class PromotionManager(
     fun cleanup() {
         try {
             onPromotionClickCallback = null
-            currentBrowserRef = null
+            // currentBrowserRef = null // DO NOT NULLIFY a weak reference, this creates a race condition
             android.util.Log.d("PromotionManager", "PromotionManager cleaned up")
         } catch (e: Exception) {
             android.util.Log.e("PromotionManager", "Error during cleanup", e)
