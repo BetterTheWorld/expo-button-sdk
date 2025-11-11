@@ -51,7 +51,25 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
   }
 
   // Remove non-serializable properties before passing to native module
-  const { onPromotionClick, ...nativeOptions } = sanitizedOptions;
+  const { onPromotionClick, ...tempOptions } = sanitizedOptions;
+
+  // Deep clean undefined values that can't be serialized
+  const cleanOptions = (obj: any): any => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) return obj.map(cleanOptions);
+    if (typeof obj === "object") {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = cleanOptions(value);
+        }
+      }
+      return cleaned;
+    }
+    return obj;
+  };
+
+  const nativeOptions = cleanOptions(tempOptions);
 
   return await ExpoButtonSdkModule.startPurchasePath(nativeOptions);
 }
