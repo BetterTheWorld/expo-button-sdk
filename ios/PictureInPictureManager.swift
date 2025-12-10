@@ -17,41 +17,68 @@ class PictureInPictureManager {
     
     func addMinimizeButton(to browser: BrowserInterface) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.createMinimizeButton()
+            self.createMinimizeButtonInHeader(browser: browser)
         }
     }
     
-    private func createMinimizeButton() {
+    private func createMinimizeButtonInHeader(browser: BrowserInterface) {
+        // Create container view for existing customActionView and minimize button
+        let containerView = UIView()
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Create minimize button with simple chevron
         let minimizeButton = UIButton(type: .system)
-        minimizeButton.setTitle("⬇", for: .normal)
-        minimizeButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .bold)
+        minimizeButton.setTitle("⌄", for: .normal)
+        minimizeButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         minimizeButton.setTitleColor(.white, for: .normal)
-        minimizeButton.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-        minimizeButton.layer.cornerRadius = 18
         minimizeButton.translatesAutoresizingMaskIntoConstraints = false
         minimizeButton.addTarget(self, action: #selector(minimizeButtonTapped), for: .touchUpInside)
         
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-            
-            var topViewController = window.rootViewController
-            while let presentedVC = topViewController?.presentedViewController {
-                topViewController = presentedVC
-            }
-            
-            if let topVC = topViewController {
-                topVC.view.addSubview(minimizeButton)
-                
-                NSLayoutConstraint.activate([
-                    minimizeButton.topAnchor.constraint(equalTo: topVC.view.safeAreaLayoutGuide.topAnchor, constant: 10),
-                    minimizeButton.trailingAnchor.constraint(equalTo: topVC.view.trailingAnchor, constant: -15),
-                    minimizeButton.widthAnchor.constraint(equalToConstant: 36),
-                    minimizeButton.heightAnchor.constraint(equalToConstant: 36)
-                ])
-                
-                topVC.view.bringSubviewToFront(minimizeButton)
-            }
+        // Get existing custom action view (deals button) if any
+        let existingView = browser.header.customActionView
+        
+        // Add views to container
+        if let existingView = existingView {
+            containerView.addSubview(existingView)
+            existingView.translatesAutoresizingMaskIntoConstraints = false
         }
+        containerView.addSubview(minimizeButton)
+        
+        // Set up constraints for horizontal layout
+        NSLayoutConstraint.activate([
+            containerView.heightAnchor.constraint(equalToConstant: 30)
+        ])
+        
+        if let existingView = existingView {
+            // Layout: [deals button] [minimize button] with spacing
+            NSLayoutConstraint.activate([
+                existingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                existingView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                
+                minimizeButton.leadingAnchor.constraint(equalTo: existingView.trailingAnchor, constant: 12),
+                minimizeButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                minimizeButton.widthAnchor.constraint(equalToConstant: 30),
+                minimizeButton.heightAnchor.constraint(equalToConstant: 30)
+            ])
+            
+            // Update container width based on content
+            containerView.widthAnchor.constraint(equalTo: existingView.widthAnchor, constant: 42).isActive = true
+        } else {
+            // Only minimize button
+            NSLayoutConstraint.activate([
+                minimizeButton.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                minimizeButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                minimizeButton.widthAnchor.constraint(equalToConstant: 30),
+                minimizeButton.heightAnchor.constraint(equalToConstant: 30),
+                
+                containerView.widthAnchor.constraint(equalToConstant: 30)
+            ])
+        }
+        
+        // Set the container as the new custom action view
+        browser.header.customActionView = containerView
     }
     
     @objc private func minimizeButtonTapped() {
@@ -211,12 +238,7 @@ class PictureInPictureManager {
             // Fade in browser simultaneously
             browserVC.view.alpha = 1.0
         }) { _ in
-            // After animation completes, clean up
-            pipWindow.isHidden = true
-            pipWindow.resignKey()
-            self.pipWindow = nil
-            
-            // Restore browser window level
+            // Restore browser window level and make it key FIRST
             if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
                 browserWindow.windowLevel = UIWindow.Level.normal
                 browserWindow.makeKeyAndVisible()
@@ -224,6 +246,13 @@ class PictureInPictureManager {
             
             browserVC.view.isUserInteractionEnabled = true
             self.isMinimized = false
+            
+            // Clean up PiP window AFTER browser is restored
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                pipWindow.isHidden = true
+                pipWindow.resignKey()
+                self.pipWindow = nil
+            }
         }
     }
     
