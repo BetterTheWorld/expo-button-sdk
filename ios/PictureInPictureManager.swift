@@ -119,8 +119,8 @@ class PictureInPictureManager {
         
         let pipFrame = CGRect(origin: pipPosition, size: pipSize)
         
-        // Create snapshot of entire browser view
-        let browserSnapshot = browserVC.view.snapshotView(afterScreenUpdates: true)
+        // Create snapshot of entire browser view with proper content
+        let browserSnapshot = browserVC.view.snapshotView(afterScreenUpdates: false)
         guard let snapshot = browserSnapshot else {
             return
         }
@@ -137,15 +137,9 @@ class PictureInPictureManager {
         let pipVC = UIViewController()
         pipWindow?.rootViewController = pipVC
         
-        // Add snapshot to PiP window and scale it to fit
-        let originalSize = browserVC.view.bounds.size
-        let scaleX = pipSize.width / originalSize.width
-        let scaleY = pipSize.height / originalSize.height
-        let scale = min(scaleX, scaleY) // Use smaller scale to maintain aspect ratio
-        
-        snapshot.frame = pipVC.view.bounds
-        snapshot.transform = CGAffineTransform(scaleX: scale, y: scale)
-        snapshot.center = CGPoint(x: pipSize.width/2, y: pipSize.height/2)
+        // Set snapshot to fill the PiP window completely
+        snapshot.frame = CGRect(origin: .zero, size: pipSize)
+        snapshot.contentMode = .scaleAspectFit
         pipVC.view.addSubview(snapshot)
         
         // Add shadow and styling to PiP window
@@ -158,53 +152,94 @@ class PictureInPictureManager {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(minimizedBrowserTapped))
         pipVC.view.addGestureRecognizer(tapGesture)
         
-        // Show PiP window
+        // Start with PiP window at full screen size for animation
+        let fullScreenFrame = CGRect(origin: .zero, size: screenBounds.size)
+        pipWindow?.frame = fullScreenFrame
         pipWindow?.makeKeyAndVisible()
         
-        // Instead of hiding the browser, let's try to make it non-blocking
-        // Set the browser window to a lower window level
-        if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
-            browserWindow.windowLevel = UIWindow.Level.normal - 1
+        // Position snapshot to fill the full screen window initially
+        snapshot.frame = CGRect(origin: .zero, size: screenBounds.size)
+        
+        // Animate PiP window to minimized size
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3, animations: {
+            // Animate window frame to target position/size
+            self.pipWindow?.frame = pipFrame
+            
+            // Animate snapshot to fit the new window size
+            snapshot.frame = CGRect(origin: .zero, size: pipSize)
+            
+            // Fade out browser simultaneously
+            browserVC.view.alpha = 0
+        }) { _ in
+            // After animation completes, set up window management
+            if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
+                browserWindow.windowLevel = UIWindow.Level.normal - 1
+            }
+            
+            // Make main window key to enable React Native interaction
+            if let mainWindow = windowScene.windows.first(where: { !$0.isEqual(self.pipWindow) && $0.windowLevel == UIWindow.Level.normal }) {
+                mainWindow.makeKeyAndVisible()
+            }
+            
+            self.isMinimized = true
         }
-        
-        // Hide browser view but keep the window structure
-        browserVC.view.alpha = 0
-        
-        // Make main window key to enable React Native interaction
-        if let mainWindow = windowScene.windows.first(where: { !$0.isEqual(pipWindow) && $0.windowLevel == UIWindow.Level.normal }) {
-            mainWindow.makeKeyAndVisible()
-        }
-        
-        isMinimized = true
     }
     
     
     private func restoreFromPiP() {
         guard let pipWindow = pipWindow,
-              let browserVC = originalBrowserViewController else { return }
+              let browserVC = originalBrowserViewController,
+              let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else { return }
         
+        let screenBounds = UIScreen.main.bounds
         
-        // Hide and remove PiP window
-        pipWindow.isHidden = true
-        pipWindow.resignKey() 
-        self.pipWindow = nil
-        
-        // Restore browser window level first
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
-            browserWindow.windowLevel = UIWindow.Level.normal
+        // Get the snapshot for animation
+        guard let snapshot = pipWindow.rootViewController?.view.subviews.first else {
+            // Fallback to instant restore if no snapshot found
+            self.instantRestore(browserVC: browserVC, windowScene: windowScene)
+            return
         }
         
-        // Show and restore original browser
-        browserVC.view.alpha = 1.0
-        browserVC.view.isUserInteractionEnabled = true
+        // Animate PiP window and snapshot back to full screen
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3, animations: {
+            // Animate window back to full screen
+            pipWindow.frame = screenBounds
+            
+            // Animate snapshot back to full size
+            snapshot.frame = CGRect(origin: .zero, size: screenBounds.size)
+            
+            // Fade in browser simultaneously
+            browserVC.view.alpha = 1.0
+        }) { _ in
+            // After animation completes, clean up
+            pipWindow.isHidden = true
+            pipWindow.resignKey()
+            self.pipWindow = nil
+            
+            // Restore browser window level
+            if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
+                browserWindow.windowLevel = UIWindow.Level.normal
+                browserWindow.makeKeyAndVisible()
+            }
+            
+            browserVC.view.isUserInteractionEnabled = true
+            self.isMinimized = false
+        }
+    }
+    
+    private func instantRestore(browserVC: UIViewController, windowScene: UIWindowScene) {
+        // Fallback instant restore
+        pipWindow?.isHidden = true
+        pipWindow?.resignKey()
+        pipWindow = nil
         
-        // Make sure browser window is key again
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
+        if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
+            browserWindow.windowLevel = UIWindow.Level.normal
             browserWindow.makeKeyAndVisible()
         }
         
+        browserVC.view.alpha = 1.0
+        browserVC.view.isUserInteractionEnabled = true
         isMinimized = false
     }
     
