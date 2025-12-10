@@ -3,7 +3,7 @@ import Button
 import UIKit
 import WebKit
 
-class PromotionManager: NSObject {
+class PromotionManager: NSObject, ScrollVisibilityObserver {
     
     private var promotionData: NSDictionary?
     private var onPromotionClickCallback: ((String, BrowserInterface?) -> Void)?
@@ -13,8 +13,6 @@ class PromotionManager: NSObject {
     private var badgeFontSize: CGFloat
     private var badgeView: UIView?
     private var isButtonHidden: Bool = false
-    private weak var webView: WKWebView?
-    private var displayLink: CADisplayLink?
     
     // Shared promo code state across all instances
     private static var sharedPendingPromoCode: String?
@@ -28,18 +26,18 @@ class PromotionManager: NSObject {
         self.badgeFontSize = badgeFontSize
         super.init()
     }
-    
+
     func setOnPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         self.onPromotionClickCallback = callback
     }
-    
+
     func setupPromotionsBadge(for browser: BrowserInterface) {
         guard let promotionData = self.promotionData else { return }
-        
+
         print("🔄 setupPromotionsBadge called, sharedPendingPromoCode: \(PromotionManager.sharedPendingPromoCode ?? "nil")")
-        
+
         self.currentBrowser = browser
-        
+
         let promotions = promotionData["promotions"] as? [[String: Any]] ?? []
         let featuredPromotion = promotionData["featuredPromotion"] as? NSDictionary
         let totalCount = promotions.count + (featuredPromotion != nil ? 1 : 0)
@@ -55,14 +53,12 @@ class PromotionManager: NSObject {
             
             setupPositionMonitoring()
             
-            setupWebViewScrollMonitoring(browser: browser)
+            // Use the new BrowserScrollEventBus
+            BrowserScrollEventBus.shared.addVisibilityObserver(self)
+            BrowserScrollEventBus.shared.startMonitoring(browser: browser)
             
             badgeView.alpha = 1.0
             isButtonHidden = false
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.checkButtonPosition()
-            }
         }
     }
     
@@ -70,144 +66,25 @@ class PromotionManager: NSObject {
         showPromotionsList()
     }
     
-    // MARK: - Position Detection Methods
+    // MARK: - ScrollVisibilityObserver Implementation
     
-    private func checkButtonPosition() {
-        guard let badgeView = self.badgeView else { 
-            return 
-        }
+    func onScrollVisibilityChanged(_ event: ScrollVisibilityEvent) {
+        print("📡 PromotionManager: Visibility event -> \(event.shouldShow ? "SHOW" : "HIDE") (\(event.reason))")
         
-        let buttonFrame = badgeView.convert(badgeView.bounds, to: nil)
-        let safeAreaInsets = getSafeAreaInsets()
-        
-        let shouldHide = isButtonInNotchArea(buttonFrame: buttonFrame, safeAreaInsets: safeAreaInsets)
-        
-        if shouldHide != isButtonHidden {
-            print("🔍 Button visibility changing: \(isButtonHidden ? "hidden" : "visible") -> \(shouldHide ? "hidden" : "visible")")
-            setButtonVisibility(!shouldHide)
-        }
-    }
-    
-    private func setupWebViewScrollMonitoring(browser: BrowserInterface) {
-        print("🔍 Setting up webview scroll monitoring")
-        print("🔍 Browser type: \(type(of: browser))")
-        
-        if let browserView = browser as? UIView {
-            print("🔍 Browser is a UIView, searching for webview...")
-            printViewHierarchy(browserView, level: 0)
-            
-            if let webView = findWebView(in: browserView) {
-                print("🔍 ✅ Found webview: \(webView)")
-                
-                self.webView = webView
-                
-                webView.scrollView.addObserver(self, forKeyPath: "contentOffset", options: [.new, .old], context: nil)
-                print("🔍 ✅ KVO observer added to webview scroll")
-            } else {
-                print("🔍 ❌ Could not find webview in browser hierarchy")
-            }
+        // Only control our badge if it's the direct customActionView
+        // If it's been wrapped by PictureInPictureManager, let that handle the visibility
+        if let badgeView = self.badgeView,
+           let browser = currentBrowser as? BrowserInterface,
+           browser.header.customActionView === badgeView {
+            setButtonVisibility(event.shouldShow)
         } else {
-            print("🔍 ❌ Browser is not a UIView")
+            print("📡 PromotionManager: Badge is wrapped by another manager, skipping visibility control")
         }
-        
-        setupHighFrequencyPositionCheck()
-    }
-    
-    private func printViewHierarchy(_ view: UIView, level: Int) {
-        let indent = String(repeating: "  ", count: level)
-        print("🔍 \(indent)\(type(of: view))")
-        
-        if view is WKWebView {
-            print("🔍 \(indent)⭐ FOUND WEBVIEW!")
-        }
-        
-        for subview in view.subviews {
-            printViewHierarchy(subview, level: level + 1)
-        }
-    }
-    
-    private func setupHighFrequencyPositionCheck() {
-        print("🔍 Setting up DisplayLink for real-time position checking")
-        
-        displayLink = CADisplayLink(target: self, selector: #selector(displayLinkFired))
-        displayLink?.add(to: .main, forMode: .common)
-        
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
-            guard let self = self else { 
-                timer.invalidate()
-                return
-            }
-            
-            self.checkButtonPosition()
-        }
-    }
-    
-    @objc private func displayLinkFired() {
-        checkButtonPosition()
-    }
-    
-    private func findWebView(in view: UIView?) -> WKWebView? {
-        guard let view = view else { return nil }
-        
-        if let webView = view as? WKWebView {
-            return webView
-        }
-        
-        for subview in view.subviews {
-            if let webView = findWebView(in: subview) {
-                return webView
-            }
-        }
-        
-        return nil
-    }
-    
-    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "contentOffset" {
-            print("🔍 Webview scroll detected, checking button position")
-            DispatchQueue.main.async {
-                self.checkButtonPosition()
-            }
-        }
-    }
-    
-    private func getSafeAreaInsets() -> UIEdgeInsets {
-        if #available(iOS 11.0, *) {
-            let window = UIApplication.shared.windows.first { $0.isKeyWindow }
-            return window?.safeAreaInsets ?? UIEdgeInsets.zero
-        }
-        return UIEdgeInsets.zero
-    }
-    
-    private func isButtonInNotchArea(buttonFrame: CGRect, safeAreaInsets: UIEdgeInsets) -> Bool {
-        guard let window = UIApplication.shared.windows.first else {
-            print("🔍 No window found")
-            return false
-        }
-        
-        let statusBarHeight = safeAreaInsets.top
-        let hasNotch = statusBarHeight > 24
-        
-        let isButtonOffScreen = buttonFrame.minY < -10
-        
-        if isButtonOffScreen {
-            return true
-        }
-        
-        if hasNotch {
-            let notchHeight = statusBarHeight
-            let notchArea = CGRect(x: 0, y: 0, width: window.bounds.width, height: notchHeight)
-            let isInNotchArea = buttonFrame.intersects(notchArea)
-            
-            return isInNotchArea
-        }
-        
-        return false
     }
     
     public func debugCheckPosition() {
         print("🔍 Manual position check triggered")
-        checkButtonPosition()
+        BrowserScrollEventBus.shared.checkVisibilityNow()
     }
     
     public func forceHideButton() {
@@ -233,7 +110,7 @@ class PromotionManager: NSObject {
     }
     
     public func updateButtonPosition() {
-        checkButtonPosition()
+        BrowserScrollEventBus.shared.checkVisibilityNow()
     }
     
     public func hideButton() {
@@ -344,33 +221,23 @@ class PromotionManager: NSObject {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
-        
-        if let webView = self.webView {
-            webView.scrollView.removeObserver(self, forKeyPath: "contentOffset")
-        }
-        
-        displayLink?.invalidate()
-        displayLink = nil
+        BrowserScrollEventBus.shared.removeVisibilityObserver(self)
     }
     
     @objc private func orientationChanged() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            self.checkButtonPosition()
-        }
+        // Event bus handles orientation changes automatically
     }
     
     @objc private func appDidBecomeActive() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.checkButtonPosition()
-        }
+        // Event bus handles app state changes automatically
     }
     
     @objc private func keyboardWillShow() {
-        checkButtonPosition()
+        // Event bus handles keyboard events automatically
     }
     
     @objc private func keyboardWillHide() {
-        checkButtonPosition()
+        // Event bus handles keyboard events automatically
     }
     
     private func showPromotionsList() {

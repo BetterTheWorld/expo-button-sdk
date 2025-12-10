@@ -3,13 +3,12 @@ import UIKit
 import WebKit
 import Button
 
-class PictureInPictureManager: NSObject {
+class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var isMinimized: Bool = false
     private var originalBrowserViewController: UIViewController?
     private var options: [String: Any]
     private var pipWindow: UIWindow?
     private var originalWebView: UIView?
-    private var webView: WKWebView?
     private var containerView: UIView?
     private var isButtonHidden: Bool = false
     
@@ -85,90 +84,25 @@ class PictureInPictureManager: NSObject {
         // Set the container as the new custom action view
         browser.header.customActionView = containerView
         
-        // NO setup scroll monitoring - let PromotionManager handle visibility
-    }
-    
-    private func setupScrollMonitoring(browser: BrowserInterface) {
-        // Find the WKWebView in browser hierarchy
-        if let browserView = browser as? UIView {
-            if let webView = findWebView(in: browserView) {
-                self.webView = webView
-                webView.scrollView.addObserver(self, forKeyPath: "contentOffset", options: [.new, .old], context: UnsafeMutableRawPointer(bitPattern: 0))
-            }
+        // Setup scroll monitoring using the event bus after a small delay
+        // to let the UI settle after wrapping the promotion badge
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            BrowserScrollEventBus.shared.addVisibilityObserver(self)
+            BrowserScrollEventBus.shared.startMonitoring(browser: browser)
         }
     }
     
-    private func findWebView(in view: UIView) -> WKWebView? {
-        if let webView = view as? WKWebView {
-            return webView
-        }
-        
-        for subview in view.subviews {
-            if let webView = findWebView(in: subview) {
-                return webView
-            }
-        }
-        
-        return nil
+    // MARK: - ScrollVisibilityObserver Implementation
+    
+    func onScrollVisibilityChanged(_ event: ScrollVisibilityEvent) {
+        print("📡 PictureInPictureManager: Visibility event -> \(event.shouldShow ? "SHOW" : "HIDE") (\(event.reason))")
+        setContainerVisibility(event.shouldShow)
     }
     
-    override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "contentOffset" {
-            DispatchQueue.main.async {
-                self.checkHeaderVisibility()
-            }
-        }
-    }
     
-    private func checkHeaderVisibility() {
-        guard let containerView = self.containerView else { return }
-        
-        // Get the container's frame in window coordinates (same as PromotionManager)
-        let containerFrame = containerView.convert(containerView.bounds, to: nil)
-        let safeAreaInsets = getSafeAreaInsets()
-        
-        // Check if container conflicts with system areas (same logic as PromotionManager)
-        let shouldHide = isContainerInNotchArea(containerFrame: containerFrame, safeAreaInsets: safeAreaInsets)
-        
-        // Only update visibility if it changed
-        if shouldHide != isButtonHidden {
-            setContainerVisibility(!shouldHide)
-        }
-    }
     
-    private func getSafeAreaInsets() -> UIEdgeInsets {
-        if #available(iOS 11.0, *) {
-            let window = UIApplication.shared.windows.first { $0.isKeyWindow }
-            return window?.safeAreaInsets ?? UIEdgeInsets.zero
-        }
-        return UIEdgeInsets.zero
-    }
     
-    private func isContainerInNotchArea(containerFrame: CGRect, safeAreaInsets: UIEdgeInsets) -> Bool {
-        guard let window = UIApplication.shared.windows.first else {
-            return false
-        }
-        
-        let statusBarHeight = safeAreaInsets.top
-        let hasNotch = statusBarHeight > 24
-        
-        // CRITICAL: Check if container is actually visible on screen
-        let isContainerOffScreen = containerFrame.minY < -10  // Container has scrolled up and out of view
-        
-        if isContainerOffScreen {
-            return true  // Hide container when it's scrolled out of view
-        }
-        
-        // For devices WITH notch: also check if container intersects with notch area
-        if hasNotch {
-            let notchHeight = statusBarHeight
-            let notchArea = CGRect(x: 0, y: 0, width: window.bounds.width, height: notchHeight)
-            let isInNotchArea = containerFrame.intersects(notchArea)
-            return isInNotchArea
-        }
-        
-        return false
-    }
+    
     
     private func setContainerVisibility(_ visible: Bool) {
         guard let containerView = self.containerView else { return }
@@ -376,10 +310,8 @@ class PictureInPictureManager: NSObject {
     }
     
     func cleanup() {
-        // Remove scroll observer
-        if let webView = self.webView {
-            webView.scrollView.removeObserver(self, forKeyPath: "contentOffset")
-        }
+        // Remove from event bus
+        BrowserScrollEventBus.shared.removeVisibilityObserver(self)
         
         // If PiP window exists, restore webview and close window
         if isMinimized && pipWindow != nil {
@@ -399,7 +331,6 @@ class PictureInPictureManager: NSObject {
         
         originalBrowserViewController = nil
         originalWebView = nil
-        webView = nil
         containerView = nil
         isMinimized = false
     }
