@@ -107,7 +107,10 @@ class ExpoButtonSdkModule() : Module() {
     private val promotionBadgeFontSize: Float
     
     // Promotion manager
-    private var promotionManager: PromotionManager? = null
+    private var promotionManager: expo.modules.buttonsdk.promotion.PromotionManager? = null
+    
+    // Picture in picture manager
+    private var pictureInPictureManager: PictureInPictureManager? = null
     
     init {
       // Parse exit confirmation config
@@ -131,7 +134,7 @@ class ExpoButtonSdkModule() : Module() {
       if (promotionData != null) {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
-          promotionManager = PromotionManager(currentActivity, promotionData, { promotionId, browser ->
+          promotionManager = expo.modules.buttonsdk.promotion.PromotionManager(currentActivity, promotionData, { promotionId, browser ->
             Log.d("CustomPurchasePathExtension", "🎯 Received promotion click: $promotionId")
             onPromotionClick(promotionId)
             Log.d("CustomPurchasePathExtension", "📤 Sent promotion event to TypeScript")
@@ -145,6 +148,16 @@ class ExpoButtonSdkModule() : Module() {
               GlobalLoaderManager.getInstance().hideLoader()
             }
           }, promotionBadgeLabel, promotionListTitle, promotionBadgeFontSize)
+        }
+      }
+      
+      // Initialize picture in picture manager if configured
+      val animationConfig = options["animationConfig"] as? Map<String, Any>
+      val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
+      if (pipConfig?.get("enabled") == true) {
+        val currentActivity = activityRef.get()
+        if (currentActivity != null) {
+          pictureInPictureManager = PictureInPictureManager(currentActivity, options)
         }
       }
     }
@@ -175,6 +188,9 @@ class ExpoButtonSdkModule() : Module() {
       
       // Setup promotions badge if available
       promotionManager?.setupPromotionsBadge(browser)
+      
+      // Setup picture in picture if available
+      pictureInPictureManager?.addMinimizeButton(browser)
     }
 
     // Helper function to parse color from hex string
@@ -221,6 +237,8 @@ class ExpoButtonSdkModule() : Module() {
         Log.d("CustomPurchasePathExtension", "Cleaning up resources")
         promotionManager?.cleanup()
         promotionManager = null
+        pictureInPictureManager?.cleanup()
+        pictureInPictureManager = null
         GlobalLoaderManager.getInstance().hideLoader()
       } catch (e: Exception) {
         Log.e("CustomPurchasePathExtension", "Error during cleanup", e)
