@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.Drawable
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
@@ -25,12 +26,13 @@ object PromotionUIFactory {
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpToPx(4), dpToPx(2), dpToPx(4), dpToPx(2))
+            // Smaller padding for more compact button
+            setPadding(dpToPx(3), dpToPx(1), dpToPx(3), dpToPx(1))
             
             val pillBackground = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
                 setColor(Color.parseColor("#F9F9FB"))
-                cornerRadius = dpToPx(13).toFloat()
+                cornerRadius = dpToPx(10).toFloat() // Smaller corner radius
             }
             
             val rippleDrawable = android.graphics.drawable.RippleDrawable(
@@ -53,16 +55,21 @@ object PromotionUIFactory {
         
         val labelView = TextView(context).apply {
             text = badgeLabel
-            textSize = badgeFontSize
+            // Force small, fixed font size regardless of system settings
+            val fixedFontSize = 9f // Even smaller, ignore badgeFontSize parameter
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, fixedFontSize)
             setTextColor(Color.parseColor("#0B72AC"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
+            
+            // Force text scaling to ignore accessibility settings
+            textScaleX = 1.0f
             
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                leftMargin = dpToPx(4)
-                rightMargin = dpToPx(4)
+                leftMargin = dpToPx(3) // Less margin
+                rightMargin = dpToPx(3) // Less margin
                 gravity = Gravity.CENTER_VERTICAL
             }
             layoutParams = params
@@ -73,16 +80,16 @@ object PromotionUIFactory {
     }
     
     private fun createTagIconView(context: Context, badgeFontSize: Float): View? {
-        val scaleFactor = badgeFontSize / 11f
-        val scaledIconSize = dpToPx((14 * scaleFactor).toInt())
+        // Force smaller icon size regardless of font size
+        val fixedIconSize = dpToPx(10) // Small fixed size
         
         val iconView = ImageView(context).apply {
-            setImageDrawable(createTagIconDrawable(badgeFontSize))
+            setImageDrawable(createTagIconDrawable(9f)) // Use fixed smaller size for icon
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
             val params = LinearLayout.LayoutParams(
-                scaledIconSize,
-                scaledIconSize
+                fixedIconSize,
+                fixedIconSize
             ).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }

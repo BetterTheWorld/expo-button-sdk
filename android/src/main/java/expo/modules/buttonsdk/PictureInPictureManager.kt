@@ -2,12 +2,14 @@ package expo.modules.buttonsdk
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Color
+import android.graphics.*
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.usebutton.sdk.purchasepath.BrowserInterface
@@ -33,73 +35,177 @@ class PictureInPictureManager(
         fun didRestore()
     }
     
+    fun isPipActive(): Boolean {
+        return isMinimized
+    }
+    
+    fun closePipAndProceed(onComplete: () -> Unit) {
+        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback")
+        
+        if (!isMinimized) {
+            Log.d("PictureInPictureManager", "PiP not active, proceeding immediately")
+            onComplete()
+            return
+        }
+        
+        // Set callback for when PiP is closed
+        delegate = object : PictureInPictureManagerDelegate {
+            override fun didMinimize() {
+                // Not needed
+            }
+            
+            override fun didRestore() {
+                Log.d("PictureInPictureManager", "PiP closed, executing callback")
+                onComplete()
+                delegate = null // Clean up
+            }
+        }
+        
+        // Close PiP
+        exitPipForNewContent()
+    }
+    
+    private fun exitPipForNewContent() {
+        if (!isMinimized) return
+        
+        Log.d("PictureInPictureManager", "Exiting PiP mode due to new content")
+        
+        // Find the Button SDK activity and exit PiP mode
+        val browser = originalBrowser ?: return
+        val browserView = browser.viewContainer ?: return
+        
+        var buttonSdkActivity: Activity? = null
+        var currentView = browserView.parent
+        
+        while (currentView != null) {
+            if (currentView is android.view.ViewGroup) {
+                val context = currentView.context
+                if (context is Activity && context.javaClass.name.contains("WebViewActivity")) {
+                    buttonSdkActivity = context
+                    break
+                }
+            }
+            currentView = currentView.parent
+        }
+        
+        val targetActivity = buttonSdkActivity ?: return
+        
+        try {
+            // Exit PiP mode programmatically
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (targetActivity.isInPictureInPictureMode) {
+                    // Cannot directly exit PiP, but we can finish the activity and restart
+                    Log.d("PictureInPictureManager", "Activity is in PiP mode - bringing it back to front")
+                    
+                    val intent = android.content.Intent(targetActivity, targetActivity.javaClass)
+                    intent.flags = android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or 
+                                  android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                  android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    targetActivity.startActivity(intent)
+                }
+            }
+            
+            isMinimized = false
+            delegate?.didRestore()
+            
+        } catch (e: Exception) {
+            Log.e("PictureInPictureManager", "Error exiting PiP for new URL", e)
+        }
+    }
+    
     fun addMinimizeButton(browser: BrowserInterface) {
         originalBrowser = browser
+        // PromotionManager will handle adding the minimize button now
+        // We just need to store the browser reference for PiP functionality
         Handler(Looper.getMainLooper()).postDelayed({
-            createMinimizeButtonInHeader(browser)
+            BrowserScrollEventBus.getInstance().addVisibilityObserver(this)
+            BrowserScrollEventBus.getInstance().startMonitoring(browser)
         }, 1000)
     }
     
-    private fun createMinimizeButtonInHeader(browser: BrowserInterface) {
-        val context = this.context
+    fun createMinimizeButton(context: Context, browser: BrowserInterface? = null): View {
+        Log.d("PictureInPictureManager", "createMinimizeButton called")
         
-        val containerView = LinearLayout(context).apply {
+        // Create the same type of button container as the promotions button
+        val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-        }
-        this.containerView = containerView
-        
-        val minimizeButton = TextView(context).apply {
-            text = "⌄"
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            setPadding(
-                dpToPx(8),
-                dpToPx(4),
-                dpToPx(8),
-                dpToPx(4)
-            )
             
-            // Add background to make it more visible
-            setBackgroundColor(Color.parseColor("#AA000000"))
+            // Increase padding for better touch area
+            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+            
+            // Create background similar to promotion button
+            val pillBackground = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(Color.parseColor("#44666666")) // Dark semi-transparent background
+                cornerRadius = dpToPx(10).toFloat()
+            }
+            
+            val rippleDrawable = android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(Color.parseColor("#20FFFFFF")),
+                pillBackground,
+                null
+            )
+            background = rippleDrawable
+            
+            isClickable = true
+            isFocusable = true
             
             setOnClickListener { 
                 Log.d("PictureInPictureManager", "Minimize button clicked!")
+                Log.d("PictureInPictureManager", "originalBrowser is: ${if (originalBrowser != null) "not null" else "null"}")
+                Log.d("PictureInPictureManager", "passed browser is: ${if (browser != null) "not null" else "null"}")
+                
+                // Use the passed browser or fallback to originalBrowser
+                val browserToUse = browser ?: originalBrowser
+                if (browserToUse != null) {
+                    // Store it for future use
+                    originalBrowser = browserToUse
+                }
+                
+                // Visual feedback
+                animate()
+                    .scaleX(0.95f)
+                    .scaleY(0.95f)
+                    .setDuration(100)
+                    .withEndAction {
+                        animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setDuration(100)
+                            .start()
+                    }
+                    .start()
+                
                 minimizeButtonTapped() 
             }
         }
         
-        // For now, just add the minimize button. 
-        // In the future, this could be enhanced to wrap existing views
-        containerView.addView(minimizeButton)
-        
-        try {
-            browser.header.setCustomActionView(containerView)
-        } catch (e: Exception) {
-            Log.w("PictureInPictureManager", "Failed to set custom action view", e)
+        // Create the chevron icon
+        val chevronIcon = ImageView(context).apply {
+            val iconSize = dpToPx(24) // Larger icon for better visibility
+            layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            
+            // Create chevron down drawable
+            val chevronDrawable = createChevronDownDrawable(Color.WHITE)
+            setImageDrawable(chevronDrawable)
         }
         
-        Handler(Looper.getMainLooper()).postDelayed({
-            BrowserScrollEventBus.getInstance().addVisibilityObserver(this)
-            BrowserScrollEventBus.getInstance().startMonitoring(browser)
-        }, 200)
+        button.addView(chevronIcon)
+        
+        Log.d("PictureInPictureManager", "Minimize button container created successfully")
+        return button
     }
+    
     
     override fun onScrollVisibilityChanged(event: ScrollVisibilityEvent) {
-        setContainerVisibility(event.shouldShow)
-    }
-    
-    private fun setContainerVisibility(visible: Boolean) {
-        val container = containerView ?: return
-        
-        isButtonHidden = !visible
-        
-        container.animate()
-            .alpha(if (visible) 1.0f else 0.0f)
-            .setDuration(300)
-            .start()
+        // The PromotionManager will handle visibility now
+        // This is just to maintain the interface
     }
     
     private fun minimizeButtonTapped() {
@@ -219,6 +325,52 @@ class PictureInPictureManager(
         delegate?.didRestore()
     }
     
+    private fun createChevronDownDrawable(color: Int): Drawable {
+        return object : Drawable() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                style = Paint.Style.STROKE
+                strokeWidth = dpToPx(2).toFloat() // Good visibility
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+
+            override fun draw(canvas: Canvas) {
+                val bounds = getBounds()
+                val centerX = bounds.centerX().toFloat()
+                val centerY = bounds.centerY().toFloat()
+                
+                // Draw chevron down (V shape) - bigger for visibility and touch
+                val size = dpToPx(7).toFloat() // Bigger chevron for better visibility
+                val path = Path()
+                
+                // Start from top-left point
+                path.moveTo(centerX - size, centerY - size/2)
+                // Draw to bottom point
+                path.lineTo(centerX, centerY + size/2)
+                // Draw to top-right point
+                path.lineTo(centerX + size, centerY - size/2)
+                
+                canvas.drawPath(path, paint)
+            }
+
+            override fun setAlpha(alpha: Int) {
+                paint.alpha = alpha
+            }
+
+            override fun setColorFilter(colorFilter: ColorFilter?) {
+                paint.colorFilter = colorFilter
+            }
+
+            override fun getOpacity(): Int {
+                return PixelFormat.TRANSLUCENT
+            }
+
+            override fun getIntrinsicWidth(): Int = dpToPx(18)
+            override fun getIntrinsicHeight(): Int = dpToPx(18)
+        }
+    }
+
     private fun dpToPx(dp: Int): Int {
         return (dp * context.resources.displayMetrics.density).toInt()
     }

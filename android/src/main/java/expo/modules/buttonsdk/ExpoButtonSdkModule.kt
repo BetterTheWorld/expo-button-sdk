@@ -167,6 +167,7 @@ class ExpoButtonSdkModule() : Module() {
       GlobalLoaderManager.getInstance().hideLoader()
       Log.d("CustomPurchasePathExtension", "🔄 Global loader hidden on browser initialization")
       
+      
       // Show pending promo code toast if available (no delay)
       promotionManager?.showPendingPromoCodeToast()
       
@@ -186,8 +187,65 @@ class ExpoButtonSdkModule() : Module() {
         tintColor = parseColor(options["footerTintColor"] as? String, Color.BLUE)
       }
       
-      // Setup promotions badge if available
-      promotionManager?.setupPromotionsBadge(browser)
+      // Check if PiP is active and close it for new purchase path
+      pictureInPictureManager?.let { pipManager ->
+        if (pipManager.isPipActive()) {
+          Log.d("CustomPurchasePathExtension", "PiP is active, closing it for new purchase path")
+          pipManager.closePipAndProceed {
+            Log.d("CustomPurchasePathExtension", "PiP closed, continuing with browser setup")
+          }
+        }
+      }
+      
+      // Ensure pictureInPictureManager is created before setting up promotions
+      if (pictureInPictureManager == null) {
+        val animationConfig = options["animationConfig"] as? Map<String, Any>
+        val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
+        if (pipConfig?.get("enabled") == true) {
+          val currentActivity = activityRef.get()
+          if (currentActivity != null) {
+            pictureInPictureManager = PictureInPictureManager(currentActivity, options)
+            Log.d("CustomPurchasePathExtension", "PictureInPictureManager created in onInitialized")
+          }
+        }
+      }
+      
+      // Setup promotions badge if available (now includes minimize button)
+      Log.d("CustomPurchasePathExtension", "About to setup promotions badge. PiP manager: ${if (pictureInPictureManager != null) "available" else "null"}")
+      Log.d("CustomPurchasePathExtension", "PromotionManager: ${if (promotionManager != null) "available" else "null"}")
+      
+      val promMgr = promotionManager
+      val pipMgr = pictureInPictureManager
+      
+      if (promMgr != null) {
+        // If we have a promotion manager, let it handle both buttons
+        promMgr.setupPromotionsBadge(browser, pipMgr)
+      } else if (pipMgr != null) {
+        // If no promotions but PiP is enabled, add just the minimize button
+        Log.d("CustomPurchasePathExtension", "No promotions, setting up standalone minimize button")
+        val currentActivity = activityRef.get()
+        if (currentActivity != null) {
+          // Create container to position minimize button on the right
+          val rightAlignedContainer = android.widget.LinearLayout(currentActivity).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.END
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+              android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+              android.widget.LinearLayout.LayoutParams.MATCH_PARENT
+            )
+          }
+          
+          val minimizeButton = pipMgr.createMinimizeButton(currentActivity, browser)
+          rightAlignedContainer.addView(minimizeButton)
+          
+          try {
+            browser.header.setCustomActionView(rightAlignedContainer)
+            Log.d("CustomPurchasePathExtension", "Standalone minimize button set successfully")
+          } catch (e: Exception) {
+            Log.e("CustomPurchasePathExtension", "Failed to set standalone minimize button", e)
+          }
+        }
+      }
       
       // Setup picture in picture if available
       pictureInPictureManager?.addMinimizeButton(browser)

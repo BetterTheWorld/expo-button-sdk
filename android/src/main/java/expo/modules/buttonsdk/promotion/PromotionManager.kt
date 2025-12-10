@@ -33,11 +33,25 @@ class PromotionManager(
         this.onPromotionClickCallback = callback
     }
     
-    fun setupPromotionsBadge(browser: BrowserInterface) {
+    fun setupPromotionsBadge(browser: BrowserInterface, pipManager: expo.modules.buttonsdk.PictureInPictureManager? = null) {
+        android.util.Log.d("PromotionManager", "setupPromotionsBadge called with PiP manager: ${pipManager != null}")
         currentBrowserRef = WeakReference(browser)
         val context = contextRef.get() ?: return
         
         val promotionCount = getPromotionCount()
+        android.util.Log.d("PromotionManager", "Promotion count: $promotionCount")
+        
+        // Create container that will hold both promotion button and minimize button
+        val headerContainer = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        
+        // Add promotion button if there are promotions (left side)
         if (promotionCount > 0) {
             val promotionButton = PromotionUIFactory.createHeaderPromotionButton(
                 context, 
@@ -50,14 +64,41 @@ class PromotionManager(
             }
             
             if (promotionButton != null) {
-                try {
-                    browser.header.setCustomActionView(promotionButton)
-                    BrowserScrollEventBus.getInstance().addVisibilityObserver(this)
-                    BrowserScrollEventBus.getInstance().startMonitoring(browser)
-                } catch (e: Exception) {
-                    android.util.Log.e("PromotionManager", "Failed to set custom action view", e)
+                headerContainer.addView(promotionButton)
+            }
+        }
+        
+        // Add flexible spacer to push minimize button to the right
+        if (pipManager != null) {
+            val spacer = android.view.View(context).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(0, 1).apply {
+                    weight = 1.0f // This will take all available space
                 }
             }
+            headerContainer.addView(spacer)
+        }
+        
+        // Add minimize button if PiP manager is available (right side)
+        pipManager?.let { 
+            android.util.Log.d("PromotionManager", "Creating minimize button with PiP manager")
+            try {
+                val minimizeButton = it.createMinimizeButton(context, browser)
+                headerContainer.addView(minimizeButton)
+                android.util.Log.d("PromotionManager", "Minimize button added to container")
+            } catch (e: Exception) {
+                android.util.Log.e("PromotionManager", "Error creating minimize button", e)
+            }
+        } ?: run {
+            android.util.Log.w("PromotionManager", "No PiP manager available - minimize button not added")
+        }
+        
+        try {
+            browser.header.setCustomActionView(headerContainer)
+            BrowserScrollEventBus.getInstance().addVisibilityObserver(this)
+            BrowserScrollEventBus.getInstance().startMonitoring(browser)
+            android.util.Log.d("PromotionManager", "Header container set with ${headerContainer.childCount} children")
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionManager", "Failed to set custom action view", e)
         }
     }
     
@@ -270,6 +311,11 @@ class PromotionManager(
         }, 2000)
         
         sharedPendingPromoCode = null
+    }
+    
+    private fun dpToPx(dp: Int): Int {
+        val context = contextRef.get() ?: return dp
+        return (dp * context.resources.displayMetrics.density).toInt()
     }
     
     fun cleanup() {
