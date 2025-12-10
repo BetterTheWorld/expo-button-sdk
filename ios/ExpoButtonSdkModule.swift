@@ -8,10 +8,38 @@ public class ExpoButtonSdkModule: Module {
             return true
         }
     
+    private func setupNotificationObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHeaderButtonClick),
+            name: NSNotification.Name("onHeaderButtonClick"),
+            object: nil
+        )
+    }
+    
+    @objc private func handleHeaderButtonClick(_ notification: Notification) {
+        if let action = notification.userInfo?["action"] as? String {
+            sendEvent("onHeaderButtonClick", ["action": action])
+        }
+    }
+    
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
         
-        Events("onPromotionClick")
+        Events("onPromotionClick", "onHeaderButtonClick")
+        
+        Function("minimizeBrowser") {
+            // No longer needed - handled by native button
+        }
+        
+        Function("maximizeBrowser") {
+            // No longer needed - handled by native button
+        }
+        
+        Function("toggleBrowserSize") {
+            // No longer needed - handled by native button
+        }
+        
         AsyncFunction("initializeSDK") { (promise: Promise) in
             if ButtonSDKDelegate.isConfigured {
                 promise.resolve(true)
@@ -92,8 +120,8 @@ public class ExpoButtonSdkModule: Module {
             Button.purchasePath.fetch(request: request) { purchasePath, error in
                 if let error = error {
                     promise.reject("FetchError", error.localizedDescription)
-                } else {
-                    purchasePath?.start()
+                } else if let purchasePath = purchasePath {
+                    purchasePath.start()
                     promise.resolve(nil)
                 }
             }

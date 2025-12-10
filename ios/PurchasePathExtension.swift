@@ -24,8 +24,12 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var promotionBadgeLabel: String?
     var promotionListTitle: String?
     var promotionBadgeFontSize: CGFloat = 11.0
+    private var options: NSDictionary?
+    private var currentBrowser: BrowserInterface?
+    private var pipManager: PictureInPictureManager?
     
     init(options: NSDictionary) {
+        self.options = options
         super.init()
         self.headerTitle = options["headerTitle"] as? String
         self.headerSubtitle = options["headerSubtitle"] as? String
@@ -124,11 +128,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 
     
     @objc func browserDidInitialize(_ browser: BrowserInterface) {
-#if DEBUG
-        print("expo-button-sdk browserDidInitialize")
-#endif
-        
-        // Don't hide loader here - wait for URL to load completely
+        currentBrowser = browser
         
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
@@ -139,10 +139,32 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
         
-        promotionManager?.setupPromotionsBadge(for: browser)
+        // Add minimize button if Picture-in-Picture mode is enabled  
+        var pipEnabled = false
         
+        if let animationConfig = options?["animationConfig"] as? [String: Any] {
+            // Check new pictureInPicture config
+            if let pipConfig = animationConfig["pictureInPicture"] as? [String: Any],
+               let enabled = pipConfig["enabled"] as? Bool {
+                pipEnabled = enabled
+            }
+            // Check legacy pictureInPictureMode
+            else if let legacyMode = animationConfig["pictureInPictureMode"] as? Bool {
+                pipEnabled = legacyMode
+            }
+        }
+        
+        if pipEnabled {
+            let optionsDict = options as? [String: Any] ?? [:]
+            pipManager = PictureInPictureManager(options: optionsDict)
+            pipManager?.addMinimizeButton(to: browser)
+        }
+        
+        promotionManager?.setupPromotionsBadge(for: browser)
         self.promotionManager?.showPendingPromoCodeToast()
     }
+    
+    // PiP functionality moved to PictureInPictureManager
     
     func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
 #if DEBUG
@@ -178,11 +200,15 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     }
     
     func browserDidClose() {
-#if DEBUG
         print("expo-button-sdk browserDidClose")
-#endif
-        // Don't hide loader here - it might be closing the old browser before opening new one
-        // Let the navigation methods handle loader visibility
+        
+        // Clean up PiP resources when browser closes
+        pipManager?.cleanup()
+        pipManager = nil
+        
+        // Clean up references
+        currentBrowser = nil
+        
         print("🔄 Browser closed - loader management delegated to navigation methods")
     }
     

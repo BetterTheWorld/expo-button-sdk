@@ -77,6 +77,82 @@ export function Example() {
           }}
         />
         <Button
+          title="Open Browser with Picture-in-Picture (Default)"
+          onPress={() => {
+            if (
+              !process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE ||
+              !process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE
+            ) {
+              return;
+            }
+
+            startPurchasePath({
+              footerBackgroundColor: "#FF3453",
+              footerTintColor: "#FF3453",
+              headerBackgroundColor: "#FF3453",
+              headerSubtitle: "Gives 10%",
+              headerSubtitleColor: "#FFE599",
+              headerTintColor: "#",
+              headerTitle: "Gapo",
+              headerTitleColor: "#347796",
+              url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
+              token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
+              animationConfig: {
+                pictureInPicture: {
+                  enabled: true
+                }
+              },
+              exitConfirmation: {
+                enabled: true,
+                title: "Are you sure you want to leave?",
+                message:
+                  "You might miss out on exclusive offers and lose your progress.",
+                stayButtonLabel: "Stay",
+                leaveButtonLabel: "Leave",
+              },
+            });
+          }}
+        />
+        <Button
+          title="Open Browser with Custom PiP Position & Size"
+          onPress={() => {
+            if (
+              !process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE ||
+              !process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE
+            ) {
+              return;
+            }
+
+            startPurchasePath({
+              footerBackgroundColor: "#FF3453",
+              footerTintColor: "#FF3453",
+              headerBackgroundColor: "#FF3453",
+              headerSubtitle: "Gives 10%",
+              headerSubtitleColor: "#FFE599",
+              headerTintColor: "#",
+              headerTitle: "Gapo",
+              headerTitleColor: "#347796",
+              url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
+              token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
+              animationConfig: {
+                pictureInPicture: {
+                  enabled: true,
+                  position: { x: 50, y: 100 },
+                  size: { width: 250, height: 400 }
+                }
+              },
+              exitConfirmation: {
+                enabled: true,
+                title: "Are you sure you want to leave?",
+                message:
+                  "You might miss out on exclusive offers and lose your progress.",
+                stayButtonLabel: "Stay",
+                leaveButtonLabel: "Leave",
+              },
+            });
+          }}
+        />
+        <Button
           title="Open Browser with Promotions"
           onPress={() => {
             if (
@@ -119,6 +195,21 @@ export function Example() {
                 message: "If you exit now, you might miss your cashback.",
                 stayButtonLabel: "Keep shopping",
                 leaveButtonLabel: "Leave anyway",
+              },
+              headerLeftIcon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAAGUjEkAAAABklEQVQoU2NkYGAAAABQABCA6gQm5gAAAABJRU5ErkJggg==",
+              headerRightButtons: [
+                { icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAAGUjEkAAAABklEQVQoU2NkYGAAAABQABCA6gQm5gAAAABJRU5ErkJggg==", action: "close" },
+                { title: "⭐", action: "favorite" }
+              ],
+              onHeaderButtonClick: (action: string) => {
+                console.log("Header Button:", action);
+              },
+              animationConfig: {
+                pictureInPicture: {
+                  enabled: true,
+                  position: { x: 20, y: 200 },
+                  size: { width: 300, height: 450 }
+                }
               },
             });
           }}

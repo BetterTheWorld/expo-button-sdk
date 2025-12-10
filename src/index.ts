@@ -1,14 +1,27 @@
-import { Identifier, StartPurchasePathOptions } from "./ExpoButtonSdk.types";
+import { Identifier, StartPurchasePathOptions, validatePictureInPictureConfig } from "./ExpoButtonSdk.types";
 import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 
 // Store the current listener to avoid accumulation
 let currentPromotionListener: any = null;
+let currentHeaderButtonListener: any = null;
 
 export async function startPurchasePath(options: StartPurchasePathOptions) {
-  // Clean up previous listener if exists
+  // Validate PictureInPicture config first
+  if (options.animationConfig?.pictureInPicture) {
+    const validation = validatePictureInPictureConfig(options.animationConfig.pictureInPicture);
+    if (!validation.isValid) {
+      throw new Error(`Invalid PictureInPicture configuration: ${validation.errors.join(', ')}`);
+    }
+  }
+
+  // Clean up previous listeners if they exist
   if (currentPromotionListener) {
     currentPromotionListener.remove();
     currentPromotionListener = null;
+  }
+  if (currentHeaderButtonListener) {
+    currentHeaderButtonListener.remove();
+    currentHeaderButtonListener = null;
   }
 
   // don't send promotionData if empty
@@ -50,8 +63,22 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     );
   }
 
+  // Set up header button listener if callback is provided
+  if (options.onHeaderButtonClick) {
+    currentHeaderButtonListener = ExpoButtonSdkModule.addListener(
+      "onHeaderButtonClick",
+      (event: { action: string }) => {
+        try {
+          options.onHeaderButtonClick!(event.action);
+        } catch (error) {
+          console.error("Error handling header button click:", error);
+        }
+      }
+    );
+  }
+
   // Remove non-serializable properties before passing to native module
-  const { onPromotionClick, ...tempOptions } = sanitizedOptions;
+  const { onPromotionClick, onHeaderButtonClick, ...tempOptions } = sanitizedOptions;
 
   // Deep clean undefined values that can't be serialized
   const cleanOptions = (obj: any): any => {
@@ -89,3 +116,4 @@ export async function initializeSDK(): Promise<boolean> {
 export function closePurchasePath() {
   return ExpoButtonSdkModule.closePurchasePath();
 }
+
