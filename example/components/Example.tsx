@@ -114,7 +114,7 @@ export function Example() {
           }}
         />
         <Button
-          title="Open Browser with Custom PiP Position & Size"
+          title="Open PiP Square (YouTube Style)"
           onPress={() => {
             if (
               !process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE ||
@@ -136,10 +136,54 @@ export function Example() {
               token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
               animationConfig: {
                 pictureInPicture: {
+                  enabled: true
+                  // No size/position = defaults to square 120x120, bottom-right
+                }
+              },
+              exitConfirmation: {
+                enabled: true,
+                title: "Are you sure you want to leave?",
+                message:
+                  "You might miss out on exclusive offers and lose your progress.",
+                stayButtonLabel: "Stay",
+                leaveButtonLabel: "Leave",
+              },
+            });
+          }}
+        />
+        <Button
+          title="Open Browser with Custom PiP Position & Size"
+          onPress={() => {
+            if (
+              !process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE ||
+              !process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE
+            ) {
+              return;
+            }
+
+            startPurchasePath({
+              footerBackgroundColor: "#FF3453",
+              footerTintColor: "#FF3453", 
+              headerBackgroundColor: "#FF3453",
+              headerSubtitle: "Gives 10%",
+              headerSubtitleColor: "#FFE599",
+              headerTintColor: "#",
+              headerTitle: "Gapo",
+              headerTitleColor: "#347796",
+              url: process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE,
+              token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
+              animationConfig: {
+                pictureInPicture: {
                   enabled: true,
                   position: { x: 50, y: 100 },
-                  size: { width: 250, height: 400 }
+                  size: { width: 180, height: 120 } // Rectangular like YouTube
                 }
+              },
+              coverImage: {
+                uri: "https://placecats.com/millie_neo/300/200"
+                // Alternative options:
+                // source: "my-local-image"  // from app bundle
+                // base64: "iVBORw0KGgoAAAANSUhEUgA..." // base64 string
               },
               exitConfirmation: {
                 enabled: true,

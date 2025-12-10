@@ -7,6 +7,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var isMinimized: Bool = false
     private var originalBrowserViewController: UIViewController?
     private var options: [String: Any]
+    private var coverImageView: UIImageView?
     private var pipWindow: UIWindow?
     private var originalWebView: UIView?
     private var containerView: UIView?
@@ -16,6 +17,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var isDragging: Bool = false
     private var dragStartLocation: CGPoint = .zero
     private var pipWindowStartFrame: CGRect = .zero
+    private var lastPipPosition: CGPoint?
     
     weak var delegate: PictureInPictureManagerDelegate?
     
@@ -154,32 +156,42 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                     height: sizeConfig["height"]?.doubleValue ?? 300
                 )
             } else {
-                // Default scale approach
-                let scale: CGFloat = 0.25
-                pipSize = CGSize(width: screenBounds.width * scale, height: screenBounds.height * scale)
+                // Default square size like YouTube (120x120 points)
+                let defaultSize: CGFloat = 120
+                pipSize = CGSize(width: defaultSize, height: defaultSize)
             }
             
-            // Custom position if provided
-            if let positionConfig = pipConfig["position"] as? [String: NSNumber] {
+            // Use last saved position, or custom position if provided, or default
+            if let savedPosition = lastPipPosition {
+                // Use the last position from previous drag
+                pipPosition = savedPosition
+            } else if let positionConfig = pipConfig["position"] as? [String: NSNumber] {
+                // Use custom position from config
                 pipPosition = CGPoint(
                     x: positionConfig["x"]?.doubleValue ?? 20,
                     y: positionConfig["y"]?.doubleValue ?? 120
                 )
             } else {
-                // Default position (bottom-right)
+                // Default position (bottom-right like YouTube)
                 pipPosition = CGPoint(
-                    x: screenBounds.width - pipSize.width - 20,
-                    y: screenBounds.height - pipSize.height - 120
+                    x: screenBounds.width - pipSize.width - 16,
+                    y: screenBounds.height - pipSize.height - 100
                 )
             }
         } else {
-            // Legacy fallback
-            let scale: CGFloat = 0.25
-            pipSize = CGSize(width: screenBounds.width * scale, height: screenBounds.height * scale)
-            pipPosition = CGPoint(
-                x: screenBounds.width - pipSize.width - 20,
-                y: screenBounds.height - pipSize.height - 120
-            )
+            // Legacy fallback - square like YouTube
+            let defaultSize: CGFloat = 120
+            pipSize = CGSize(width: defaultSize, height: defaultSize)
+            
+            // Use last saved position or default
+            if let savedPosition = lastPipPosition {
+                pipPosition = savedPosition
+            } else {
+                pipPosition = CGPoint(
+                    x: screenBounds.width - pipSize.width - 16,
+                    y: screenBounds.height - pipSize.height - 100
+                )
+            }
         }
         
         let pipFrame = CGRect(origin: pipPosition, size: pipSize)
@@ -204,8 +216,14 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         
         // Set snapshot to fill the PiP window completely
         snapshot.frame = CGRect(origin: .zero, size: pipSize)
-        snapshot.contentMode = .scaleAspectFit
+        snapshot.contentMode = .scaleAspectFill
+        snapshot.clipsToBounds = true
         pipVC.view.addSubview(snapshot)
+        
+        // Add cover image if provided
+        if let coverImageConfig = options["coverImage"] as? [String: Any] {
+            setupCoverImage(in: pipVC.view, size: pipSize, config: coverImageConfig)
+        }
         
         // Add shadow and styling to PiP window
         pipWindow?.layer.shadowColor = UIColor.black.cgColor
@@ -388,6 +406,8 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                     pipWindow.layer.shadowRadius = 8
                 }) { _ in
                     self.isDragging = false
+                    // Save the final position for future minimizations
+                    self.lastPipPosition = finalFrame.origin
                 }
             }
             
@@ -466,6 +486,57 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         return UIEdgeInsets.zero
     }
     
+    private func setupCoverImage(in containerView: UIView, size: CGSize, config: [String: Any]) {
+        let imageView = UIImageView()
+        imageView.frame = CGRect(origin: .zero, size: size)
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        imageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
+        
+        // Try to load image from different sources
+        if let imageUrlString = config["uri"] as? String,
+           let imageUrl = URL(string: imageUrlString) {
+            // Load from URL
+            loadImageFromURL(imageUrl, into: imageView)
+        } else if let imageName = config["source"] as? String {
+            // Load from bundle
+            if let bundleImage = UIImage(named: imageName) {
+                imageView.image = bundleImage
+            }
+        } else if let base64String = config["base64"] as? String {
+            // Load from base64
+            if let imageData = Data(base64Encoded: base64String),
+               let image = UIImage(data: imageData) {
+                imageView.image = image
+            }
+        }
+        
+        // Add subtle overlay to distinguish from background
+        let overlayView = UIView()
+        overlayView.frame = imageView.bounds
+        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.05)
+        imageView.addSubview(overlayView)
+        
+        containerView.addSubview(imageView)
+        self.coverImageView = imageView
+        
+        // Ensure cover image is on top
+        containerView.bringSubviewToFront(imageView)
+    }
+    
+    private func loadImageFromURL(_ url: URL, into imageView: UIImageView) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data, error == nil else {
+                print("PiP: Failed to load cover image from URL: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            DispatchQueue.main.async {
+                imageView.image = UIImage(data: data)
+            }
+        }.resume()
+    }
+    
     func cleanup() {
         // Remove from event bus
         BrowserScrollEventBus.shared.removeVisibilityObserver(self)
@@ -489,12 +560,14 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         originalBrowserViewController = nil
         originalWebView = nil
         containerView = nil
+        coverImageView = nil
         isMinimized = false
         
         // Reset drag state
         isDragging = false
         dragStartLocation = .zero
         pipWindowStartFrame = .zero
+        lastPipPosition = nil
     }
 }
 
