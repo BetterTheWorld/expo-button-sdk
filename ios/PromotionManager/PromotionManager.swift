@@ -69,7 +69,6 @@ class PromotionManager: NSObject, ScrollVisibilityObserver {
     // MARK: - ScrollVisibilityObserver Implementation
     
     func onScrollVisibilityChanged(_ event: ScrollVisibilityEvent) {
-        print("📡 PromotionManager: Visibility event -> \(event.shouldShow ? "SHOW" : "HIDE") (\(event.reason))")
         
         // Only control our badge if it's the direct customActionView
         // If it's been wrapped by PictureInPictureManager, let that handle the visibility

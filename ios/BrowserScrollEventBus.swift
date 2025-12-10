@@ -505,7 +505,6 @@ final class BrowserScrollEventBus: NSObject {
                 hasNotch: safeAreaInsets.top > 24
             )
             
-            print("📡 ScrollEventBus: Visibility change -> \(shouldShow ? "SHOW" : "HIDE") (\(reason))")
             notifyVisibilityObservers(with: event)
         }
     }

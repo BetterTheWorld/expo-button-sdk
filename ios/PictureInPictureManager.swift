@@ -102,7 +102,6 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     // MARK: - ScrollVisibilityObserver Implementation
     
     func onScrollVisibilityChanged(_ event: ScrollVisibilityEvent) {
-        print("📡 PictureInPictureManager: Visibility event -> \(event.shouldShow ? "SHOW" : "HIDE") (\(event.reason))")
         setContainerVisibility(event.shouldShow)
     }
     
@@ -289,6 +288,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             
             // Animate snapshot back to full size
             snapshot.frame = CGRect(origin: .zero, size: screenBounds.size)
+            
+            // Fade out cover image if present
+            if let coverImageView = self.coverImageView {
+                coverImageView.alpha = 0.0
+            }
             
             // Fade in browser simultaneously
             browserVC.view.alpha = 1.0
