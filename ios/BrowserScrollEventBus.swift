@@ -511,49 +511,33 @@ final class BrowserScrollEventBus: NSObject {
     }
     
     private func isInScrollHideZone(safeAreaInsets: UIEdgeInsets) -> Bool {
-        guard let window = UIApplication.shared.windows.first else { 
-            print("📡 ScrollEventBus: No window found")
-            return false 
-        }
+        guard let window = UIApplication.shared.windows.first else { return false }
         
         let statusBarHeight = safeAreaInsets.top
         let hasNotch = statusBarHeight > 24
         
-        print("📡 ScrollEventBus: Checking hide zone - statusBarHeight: \(statusBarHeight), hasNotch: \(hasNotch)")
-        
         if let headerView = getAnyHeaderView() {
-            let viewFrame = headerView.convert(headerView.bounds, to: nil)
-            print("📡 ScrollEventBus: Header view found - frame: \(viewFrame)")
-            
-            let shouldHide = isViewInNotchArea(
-                viewFrame: viewFrame,
+            return isViewInNotchArea(
+                viewFrame: headerView.convert(headerView.bounds, to: nil),
                 safeAreaInsets: safeAreaInsets,
                 window: window,
                 hasNotch: hasNotch
             )
-            
-            print("📡 ScrollEventBus: Header view shouldHide: \(shouldHide)")
-            return shouldHide
         }
         
         if let webView = monitoredWebViews.first?.webView {
             let scrollOffset = webView.scrollView.contentOffset.y
             let hideThreshold: CGFloat = hasNotch ? 50 : 20
-            print("📡 ScrollEventBus: Using webView fallback - scrollOffset: \(scrollOffset), threshold: \(hideThreshold)")
             return scrollOffset > hideThreshold
         }
         
-        print("📡 ScrollEventBus: No header view or webView found - defaulting to false")
         return false
     }
     
     private func isViewInNotchArea(viewFrame: CGRect, safeAreaInsets: UIEdgeInsets, window: UIWindow, hasNotch: Bool) -> Bool {
         let isViewOffScreen = viewFrame.minY < -10
         
-        print("📡 ScrollEventBus: isViewOffScreen check - viewFrame.minY: \(viewFrame.minY), threshold: -10, isOffScreen: \(isViewOffScreen)")
-        
         if isViewOffScreen {
-            print("📡 ScrollEventBus: View is off screen - HIDING")
             return true
         }
         
@@ -565,11 +549,9 @@ final class BrowserScrollEventBus: NSObject {
             let conflictThreshold = notchHeight - 10 // Allow 10pt buffer below notch
             let viewTooHighInNotch = viewFrame.minY < conflictThreshold
             
-            print("📡 ScrollEventBus: Notch check - notchHeight: \(notchHeight), conflictThreshold: \(conflictThreshold), viewFrame.minY: \(viewFrame.minY), tooHigh: \(viewTooHighInNotch)")
             return viewTooHighInNotch
         }
         
-        print("📡 ScrollEventBus: No notch and not off screen - SHOWING")
         return false
     }
     
@@ -607,7 +589,6 @@ final class BrowserScrollEventBus: NSObject {
         let shouldHide = isInScrollHideZone(safeAreaInsets: safeAreaInsets)
         let shouldShow = !shouldHide
         
-        print("📡 ScrollEventBus: Sending initial state to \(observer.observerId) - shouldShow: \(shouldShow), currentVisibilityState was: \(currentVisibilityState)")
         
         let event = ScrollVisibilityEvent(
             timestamp: Date().timeIntervalSince1970,

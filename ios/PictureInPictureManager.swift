@@ -12,6 +12,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var containerView: UIView?
     private var isButtonHidden: Bool = false
     
+    // Drag & Drop properties
+    private var isDragging: Bool = false
+    private var dragStartLocation: CGPoint = .zero
+    private var pipWindowStartFrame: CGRect = .zero
+    
     weak var delegate: PictureInPictureManagerDelegate?
     
     init(options: [String: Any]) {
@@ -208,9 +213,8 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         pipWindow?.layer.shadowOpacity = 0.3
         pipWindow?.layer.shadowRadius = 8
         
-        // Add tap gesture to restore
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(minimizedBrowserTapped))
-        pipVC.view.addGestureRecognizer(tapGesture)
+        // Add gestures for interaction
+        setupPiPGestures(for: pipVC.view)
         
         // Start with PiP window at full screen size for animation
         let fullScreenFrame = CGRect(origin: .zero, size: screenBounds.size)
@@ -305,8 +309,161 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         isMinimized = false
     }
     
+    // MARK: - PiP Gesture Handling
+    
+    private func setupPiPGestures(for view: UIView) {
+        // Pan gesture for dragging (primary gesture)
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        
+        // Tap gesture to restore (single tap)
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(minimizedBrowserTapped))
+        tapGesture.numberOfTapsRequired = 1
+        
+        // Configure gesture interactions
+        // Tap should fail if there's any significant pan movement
+        tapGesture.require(toFail: panGesture)
+        
+        view.addGestureRecognizer(panGesture)
+        view.addGestureRecognizer(tapGesture)
+    }
+    
     @objc private func minimizedBrowserTapped() {
         restoreFromPiP()
+    }
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard let pipWindow = self.pipWindow else { return }
+        
+        switch gesture.state {
+        case .began:
+            isDragging = true
+            pipWindowStartFrame = pipWindow.frame
+            
+            // Immediate visual feedback
+            UIView.animate(withDuration: 0.15, animations: {
+                pipWindow.transform = CGAffineTransform(scaleX: 1.03, y: 1.03)
+                pipWindow.layer.shadowOpacity = 0.5
+                pipWindow.layer.shadowRadius = 10
+            })
+            
+        case .changed:
+            let translation = gesture.translation(in: nil)
+            let newOrigin = CGPoint(
+                x: pipWindowStartFrame.origin.x + translation.x,
+                y: pipWindowStartFrame.origin.y + translation.y
+            )
+            
+            // Apply bounds checking
+            let constrainedFrame = constrainPiPFrame(
+                origin: newOrigin,
+                size: pipWindow.frame.size
+            )
+            
+            pipWindow.frame = constrainedFrame
+            
+        case .ended:
+            // Check if there was significant movement to determine if it was a drag or tap
+            let translation = gesture.translation(in: nil)
+            let distance = sqrt(translation.x * translation.x + translation.y * translation.y)
+            
+            if distance < 10 {
+                // Minimal movement - treat as tap, restore PiP
+                
+                UIView.animate(withDuration: 0.15, animations: {
+                    pipWindow.transform = .identity
+                    pipWindow.layer.shadowOpacity = 0.3
+                    pipWindow.layer.shadowRadius = 8
+                }) { _ in
+                    self.isDragging = false
+                    self.restoreFromPiP()
+                }
+            } else {
+                // Significant movement - complete the drag
+                let finalFrame = snapToEdges(currentFrame: pipWindow.frame)
+                
+                UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, animations: {
+                    pipWindow.frame = finalFrame
+                    pipWindow.transform = .identity
+                    pipWindow.layer.shadowOpacity = 0.3
+                    pipWindow.layer.shadowRadius = 8
+                }) { _ in
+                    self.isDragging = false
+                }
+            }
+            
+        case .cancelled:
+            
+            UIView.animate(withDuration: 0.3, animations: {
+                pipWindow.frame = self.pipWindowStartFrame
+                pipWindow.transform = .identity
+                pipWindow.layer.shadowOpacity = 0.3
+                pipWindow.layer.shadowRadius = 8
+            }) { _ in
+                self.isDragging = false
+            }
+            
+        default:
+            break
+        }
+    }
+    
+    private func constrainPiPFrame(origin: CGPoint, size: CGSize) -> CGRect {
+        let screenBounds = UIScreen.main.bounds
+        let margin: CGFloat = 10
+        
+        let minX = margin
+        let maxX = screenBounds.width - size.width - margin
+        let minY = margin
+        let maxY = screenBounds.height - size.height - margin
+        
+        let constrainedX = max(minX, min(maxX, origin.x))
+        let constrainedY = max(minY, min(maxY, origin.y))
+        
+        return CGRect(
+            x: constrainedX,
+            y: constrainedY,
+            width: size.width,
+            height: size.height
+        )
+    }
+    
+    private func snapToEdges(currentFrame: CGRect) -> CGRect {
+        let screenBounds = UIScreen.main.bounds
+        let snapMargin: CGFloat = 20
+        
+        var newFrame = currentFrame
+        
+        // Snap to left or right edge (whichever is closer)
+        let distanceToLeft = currentFrame.minX
+        let distanceToRight = screenBounds.width - currentFrame.maxX
+        
+        if distanceToLeft < distanceToRight {
+            // Snap to left
+            newFrame.origin.x = snapMargin
+        } else {
+            // Snap to right
+            newFrame.origin.x = screenBounds.width - currentFrame.width - snapMargin
+        }
+        
+        // Keep Y position but ensure it's within safe bounds
+        let safeAreaInsets = getSafeAreaInsets()
+        let topMargin = safeAreaInsets.top + 20
+        let bottomMargin = safeAreaInsets.bottom + 20
+        
+        let minY = topMargin
+        let maxY = screenBounds.height - currentFrame.height - bottomMargin
+        
+        newFrame.origin.y = max(minY, min(maxY, currentFrame.origin.y))
+        
+        return newFrame
+    }
+    
+    private func getSafeAreaInsets() -> UIEdgeInsets {
+        if #available(iOS 11.0, *) {
+            let window = UIApplication.shared.windows.first { $0.isKeyWindow }
+            return window?.safeAreaInsets ?? UIEdgeInsets.zero
+        }
+        return UIEdgeInsets.zero
     }
     
     func cleanup() {
@@ -333,6 +490,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         originalWebView = nil
         containerView = nil
         isMinimized = false
+        
+        // Reset drag state
+        isDragging = false
+        dragStartLocation = .zero
+        pipWindowStartFrame = .zero
     }
 }
 
