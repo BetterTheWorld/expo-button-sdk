@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
 import com.usebutton.sdk.purchasepath.BrowserInterface
 import expo.modules.buttonsdk.GlobalLoaderManager
 import expo.modules.buttonsdk.events.BrowserScrollEventBus
@@ -24,6 +26,7 @@ class PromotionManager(
     private var isBottomSheetOpen = false
     private var currentBrowserRef: WeakReference<BrowserInterface>? = null
     private var isButtonHidden = false
+    private var currentBottomSheetView: View? = null
     
     companion object {
         private var sharedPendingPromoCode: String? = null
@@ -57,11 +60,13 @@ class PromotionManager(
                 context, 
                 promotionCount,
                 badgeLabel,
-                badgeFontSize
-            ) {
-                android.util.Log.d("PromotionManager", "Header promotion button clicked")
-                showPromotionsList()
-            }
+                badgeFontSize,
+                onClickListener = {
+                    android.util.Log.d("PromotionManager", "Header promotion button clicked")
+                    showPromotionsList()
+                },
+                hideBadgeText = pipManager != null // Hide badge text when PiP manager is present, but show count
+            )
             
             if (promotionButton != null) {
                 headerContainer.addView(promotionButton)
@@ -181,8 +186,8 @@ class PromotionManager(
     
     private fun showPromotionsBottomSheet(promotions: List<Pair<String, String>>) {
         if (isBottomSheetOpen) {
-            android.util.Log.d("PromotionManager", "Bottom sheet already open, ignoring request")
-            return
+            android.util.Log.d("PromotionManager", "BOTTOM SHEET ALREADY OPEN - FORCING CLOSE FIRST")
+            isBottomSheetOpen = false
         }
 
         val browser = currentBrowserRef?.get() ?: return
@@ -195,6 +200,17 @@ class PromotionManager(
         }
         
         try {
+            // Force remove any existing bottom sheet first
+            if (currentBottomSheetView != null) {
+                android.util.Log.d("PromotionManager", "FORCING REMOVAL OF EXISTING BOTTOM SHEET")
+                try {
+                    container.removeView(currentBottomSheetView)
+                } catch (e: Exception) {
+                    android.util.Log.e("PromotionManager", "Error removing existing sheet", e)
+                }
+                currentBottomSheetView = null
+            }
+            
             isBottomSheetOpen = true
             
             val bottomSheet = PromotionBottomSheetFactory.createBottomSheet(
@@ -202,7 +218,7 @@ class PromotionManager(
                 promotionData = promotionData,
                 listTitle = listTitle,
                 onPromotionClick = { promotionId: String ->
-                    isBottomSheetOpen = false
+                    forceCloseBottomSheet(container)
                     
                     savePromoCodeForPromotion(promotionId)
                     
@@ -230,10 +246,12 @@ class PromotionManager(
                     }, 1000)
                 },
                 onClose = {
-                    isBottomSheetOpen = false
+                    forceCloseBottomSheet(container)
                 }
             )
             
+            // Store reference before adding
+            currentBottomSheetView = bottomSheet
             container.addView(bottomSheet)
             PromotionBottomSheetFactory.animateBottomSheetEntry(bottomSheet, container)
             
@@ -311,6 +329,41 @@ class PromotionManager(
         }, 2000)
         
         sharedPendingPromoCode = null
+    }
+    
+    private fun forceCloseBottomSheet(container: ViewGroup) {
+        android.util.Log.d("PromotionManager", "FORCE CLOSE BOTTOM SHEET CALLED")
+        
+        try {
+            // Reset state first
+            isBottomSheetOpen = false
+            
+            // Remove current view if exists
+            if (currentBottomSheetView != null) {
+                container.removeView(currentBottomSheetView)
+                currentBottomSheetView = null
+                android.util.Log.d("PromotionManager", "CURRENT BOTTOM SHEET REMOVED")
+            }
+            
+            // Nuclear option - remove ALL children and re-add only the browser content
+            val childCount = container.childCount
+            android.util.Log.d("PromotionManager", "Container has $childCount children")
+            
+            // Find and preserve the browser view (usually the first child)
+            val browserView = if (childCount > 0) container.getChildAt(0) else null
+            
+            // Remove everything
+            container.removeAllViews()
+            
+            // Add back only the browser view
+            if (browserView != null) {
+                container.addView(browserView)
+                android.util.Log.d("PromotionManager", "Browser view restored, all overlays removed")
+            }
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionManager", "Error in force close", e)
+        }
     }
     
     private fun dpToPx(dp: Int): Int {

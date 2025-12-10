@@ -21,13 +21,16 @@ object PromotionUIFactory {
         count: Int,
         badgeLabel: String,
         badgeFontSize: Float,
-        onClickListener: () -> Unit
+        onClickListener: () -> Unit,
+        hideBadgeText: Boolean = false
     ): View? {
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            // Smaller padding for more compact button
-            setPadding(dpToPx(3), dpToPx(1), dpToPx(3), dpToPx(1))
+            // Smaller padding for more compact button - even smaller when hiding badge text
+            val paddingHorizontal = if (hideBadgeText) dpToPx(2) else dpToPx(3)
+            val paddingVertical = dpToPx(1)
+            setPadding(paddingHorizontal, paddingVertical, paddingHorizontal, paddingVertical)
             
             val pillBackground = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
@@ -53,11 +56,14 @@ object PromotionUIFactory {
             button.addView(iconView)
         }
         
+        // Add text label - show number if hideBadgeText, otherwise show full label
+        val labelText = if (hideBadgeText) count.toString() else badgeLabel
+        
         val labelView = TextView(context).apply {
-            text = badgeLabel
-            // Force small, fixed font size regardless of system settings
-            val fixedFontSize = 9f // Even smaller, ignore badgeFontSize parameter
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, fixedFontSize)
+            text = labelText
+            // Smaller font size like before but slightly readable
+            val fontSize = if (hideBadgeText) 9f else 9f // Keep small, same as before
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize)
             setTextColor(Color.parseColor("#0B72AC"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             
@@ -69,7 +75,7 @@ object PromotionUIFactory {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 leftMargin = dpToPx(3) // Less margin
-                rightMargin = dpToPx(3) // Less margin
+                rightMargin = if (hideBadgeText) dpToPx(2) else dpToPx(3) // Even less margin when showing number only
                 gravity = Gravity.CENTER_VERTICAL
             }
             layoutParams = params
@@ -80,11 +86,11 @@ object PromotionUIFactory {
     }
     
     private fun createTagIconView(context: Context, badgeFontSize: Float): View? {
-        // Force smaller icon size regardless of font size
-        val fixedIconSize = dpToPx(10) // Small fixed size
+        // Much bigger icon size for better visibility
+        val fixedIconSize = dpToPx(16) // Increased from 12 to 16 (more noticeable)
         
         val iconView = ImageView(context).apply {
-            setImageDrawable(createTagIconDrawable(9f)) // Use fixed smaller size for icon
+            setImageDrawable(createTagIconDrawable(12f)) // Much bigger size for icon
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
             val params = LinearLayout.LayoutParams(

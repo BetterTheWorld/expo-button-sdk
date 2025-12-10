@@ -5,6 +5,8 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.Promise
 import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.graphics.Color
 import com.usebutton.sdk.Button
@@ -13,6 +15,12 @@ import java.lang.ref.WeakReference
 import android.webkit.URLUtil
 
 class ExpoButtonSdkModule() : Module() {
+  
+  // Keep reference to current PictureInPictureManager to close PiP on new purchase paths
+  companion object {
+    private var currentPictureInPictureManager: PictureInPictureManager? = null
+    private var isNewPurchasePathStarting = false
+  }
 
   override fun definition() = ModuleDefinition {
     Name("ExpoButtonSdk")
@@ -36,6 +44,28 @@ class ExpoButtonSdkModule() : Module() {
     AsyncFunction("startPurchasePath") { params: Map<String, Any>, promise: Promise ->
       val url = params["url"] as? String ?: ""
       val token = params["token"] as? String
+
+      // Set flag that new purchase path is starting from React Native
+      isNewPurchasePathStarting = true
+      Log.d("ButtonSdk", "NEW PURCHASE PATH STARTING - Flag set to bypass exit modal")
+      
+      // Safety reset after 5 seconds in case something fails
+      Handler(Looper.getMainLooper()).postDelayed({
+        if (isNewPurchasePathStarting) {
+          Log.d("ButtonSdk", "SAFETY: Resetting isNewPurchasePathStarting flag after timeout")
+          isNewPurchasePathStarting = false
+        }
+      }, 5000)
+
+      // Check if PiP is active and close it BEFORE starting new purchase path
+      currentPictureInPictureManager?.let { pipManager ->
+        if (pipManager.isPipActive()) {
+          Log.d("ButtonSdk", "PiP is active, closing it before new startPurchasePath")
+          pipManager.closePipAndProceed {
+            Log.d("ButtonSdk", "PiP closed, continuing with new purchase path")
+          }
+        }
+      }
 
       // URL validation with backwards compatibility
       if (url.isBlank()) {
@@ -158,6 +188,7 @@ class ExpoButtonSdkModule() : Module() {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
           pictureInPictureManager = PictureInPictureManager(currentActivity, options)
+          currentPictureInPictureManager = pictureInPictureManager // Save reference
         }
       }
     }
@@ -205,6 +236,7 @@ class ExpoButtonSdkModule() : Module() {
           val currentActivity = activityRef.get()
           if (currentActivity != null) {
             pictureInPictureManager = PictureInPictureManager(currentActivity, options)
+            currentPictureInPictureManager = pictureInPictureManager // Save reference
             Log.d("CustomPurchasePathExtension", "PictureInPictureManager created in onInitialized")
           }
         }
@@ -271,6 +303,26 @@ class ExpoButtonSdkModule() : Module() {
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
     override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
       Log.d("CustomPurchasePathExtension", "onShouldClose called, exitConfirmationEnabled: $exitConfirmationEnabled")
+      
+      // Check if new purchase path is starting from React Native - ONLY skip modal for SYSTEM closure
+      if (isNewPurchasePathStarting) {
+        Log.d("CustomPurchasePathExtension", "NEW PURCHASE PATH STARTING - SYSTEM CLOSURE - SKIPPING EXIT MODAL")
+        isNewPurchasePathStarting = false // Reset flag immediately after use
+        return true // Allow closure without confirmation
+      }
+
+      // For USER actions, show modal normally if PiP is active but NOT closing for new content
+      val pipManager = pictureInPictureManager ?: currentPictureInPictureManager
+      if (pipManager != null && pipManager.isClosingForNewContent()) {
+        Log.d("CustomPurchasePathExtension", "PiP is closing for new content (SYSTEM), skipping exit confirmation")
+        return true // Allow closure without confirmation
+      }
+      
+      // If PiP is just minimized but user is closing manually, SHOW the modal
+      if (pipManager != null && pipManager.isPipActive()) {
+        Log.d("CustomPurchasePathExtension", "PiP is active but USER is closing - SHOWING EXIT MODAL")
+        // Let it fall through to show modal
+      }
       
       if (exitConfirmationEnabled) {
         val currentActivity = activityRef.get()

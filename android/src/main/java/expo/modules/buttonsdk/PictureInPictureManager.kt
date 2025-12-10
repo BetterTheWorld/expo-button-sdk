@@ -27,6 +27,7 @@ class PictureInPictureManager(
     private var originalBrowser: BrowserInterface? = null
     private var containerView: LinearLayout? = null
     private var isButtonHidden = false
+    private var isClosingForNewContent = false
     
     var delegate: PictureInPictureManagerDelegate? = null
     
@@ -48,6 +49,9 @@ class PictureInPictureManager(
             return
         }
         
+        // Set flag to bypass exit confirmation
+        isClosingForNewContent = true
+        
         // Set callback for when PiP is closed
         delegate = object : PictureInPictureManagerDelegate {
             override fun didMinimize() {
@@ -56,6 +60,7 @@ class PictureInPictureManager(
             
             override fun didRestore() {
                 Log.d("PictureInPictureManager", "PiP closed, executing callback")
+                isClosingForNewContent = false
                 onComplete()
                 delegate = null // Clean up
             }
@@ -63,6 +68,10 @@ class PictureInPictureManager(
         
         // Close PiP
         exitPipForNewContent()
+    }
+    
+    fun isClosingForNewContent(): Boolean {
+        return isClosingForNewContent
     }
     
     private fun exitPipForNewContent() {
@@ -163,20 +172,7 @@ class PictureInPictureManager(
                     originalBrowser = browserToUse
                 }
                 
-                // Visual feedback
-                animate()
-                    .scaleX(0.95f)
-                    .scaleY(0.95f)
-                    .setDuration(100)
-                    .withEndAction {
-                        animate()
-                            .scaleX(1.0f)
-                            .scaleY(1.0f)
-                            .setDuration(100)
-                            .start()
-                    }
-                    .start()
-                
+                // Call minimize immediately, remove animation that might interfere
                 minimizeButtonTapped() 
             }
         }
