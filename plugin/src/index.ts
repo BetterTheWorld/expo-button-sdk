@@ -32,6 +32,27 @@ const withButtonConfig: ConfigPlugin<ButtonConfigPluginProps> = (
     }
     mainApplication?.['meta-data']?.push(metaDataElement);
 
+    // Enable Picture-in-Picture support for the main activity
+    const mainActivity = mainApplication?.activity?.find(
+      (activity) => activity.$["android:name"] === ".MainActivity"
+    );
+    if (mainActivity) {
+      mainActivity.$["android:supportsPictureInPicture"] = "true";
+      // Ensure configuration changes are handled to prevent activity restart on PiP
+      // Adding 'smallestScreenSize|screenLayout|screenSize' is recommended for PiP
+      const existingConfigChanges = mainActivity.$["android:configChanges"] || "";
+      const requiredChanges = ["smallestScreenSize", "screenLayout", "screenSize", "orientation"];
+      const newConfigChanges = requiredChanges
+        .filter((change) => !existingConfigChanges.includes(change))
+        .join("|");
+      
+      if (newConfigChanges) {
+        mainActivity.$["android:configChanges"] = existingConfigChanges 
+          ? `${existingConfigChanges}|${newConfigChanges}`
+          : newConfigChanges;
+      }
+    }
+
     return config;
   });
 

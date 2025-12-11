@@ -24,8 +24,12 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var promotionBadgeLabel: String?
     var promotionListTitle: String?
     var promotionBadgeFontSize: CGFloat = 11.0
+    private var options: NSDictionary?
+    private var currentBrowser: BrowserInterface?
+    private var pipManager: PictureInPictureManager?
     
     init(options: NSDictionary) {
+        self.options = options
         super.init()
         self.headerTitle = options["headerTitle"] as? String
         self.headerSubtitle = options["headerSubtitle"] as? String
@@ -67,8 +71,34 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         }
     }
     
+    private var cleanupCompletion: (() -> Void)?
+    
     func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         promotionManager?.setOnPromotionClickCallback(callback)
+    }
+    
+    func cleanup(completion: (() -> Void)? = nil) {
+        // Ensure UI updates are on main thread
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.cleanup(completion: completion)
+            }
+            return
+        }
+        
+        pipManager?.cleanup()
+        pipManager = nil
+        
+        if let browser = currentBrowser {
+            // Store completion block to be called in browserDidClose
+            self.cleanupCompletion = completion
+            browser.dismiss()
+            // Note: browserDidClose will be called by the SDK when dismiss completes
+        } else {
+            // No browser to close, execute completion immediately
+            currentBrowser = nil
+            completion?()
+        }
     }
     
     func closeBrowserIfNeeded(_ browser: BrowserInterface) {
@@ -124,11 +154,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
 
     
     @objc func browserDidInitialize(_ browser: BrowserInterface) {
-#if DEBUG
-        print("expo-button-sdk browserDidInitialize")
-#endif
-        
-        // Don't hide loader here - wait for URL to load completely
+        currentBrowser = browser
         
         browser.header.title.text = self.headerTitle
         browser.header.subtitle.text = self.headerSubtitle
@@ -139,10 +165,32 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         browser.footer.backgroundColor = self.footerBackgroundColor
         browser.footer.tintColor = self.footerTintColor
         
-        promotionManager?.setupPromotionsBadge(for: browser)
+        // Add minimize button if Picture-in-Picture mode is enabled  
+        var pipEnabled = false
         
+        if let animationConfig = options?["animationConfig"] as? [String: Any] {
+            // Check new pictureInPicture config
+            if let pipConfig = animationConfig["pictureInPicture"] as? [String: Any],
+               let enabled = pipConfig["enabled"] as? Bool {
+                pipEnabled = enabled
+            }
+            // Check legacy pictureInPictureMode
+            else if let legacyMode = animationConfig["pictureInPictureMode"] as? Bool {
+                pipEnabled = legacyMode
+            }
+        }
+        
+        if pipEnabled {
+            let optionsDict = options as? [String: Any] ?? [:]
+            pipManager = PictureInPictureManager(options: optionsDict)
+            pipManager?.addMinimizeButton(to: browser)
+        }
+        
+        promotionManager?.setupPromotionsBadge(for: browser)
         self.promotionManager?.showPendingPromoCodeToast()
     }
+    
+    // PiP functionality moved to PictureInPictureManager
     
     func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
 #if DEBUG
@@ -178,12 +226,25 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     }
     
     func browserDidClose() {
-#if DEBUG
         print("expo-button-sdk browserDidClose")
-#endif
-        // Don't hide loader here - it might be closing the old browser before opening new one
-        // Let the navigation methods handle loader visibility
+        
+        // Clean up PiP resources when browser closes
+        pipManager?.cleanup()
+        pipManager = nil
+        
+        // Clean up references
+        currentBrowser = nil
+        
         print("🔄 Browser closed - loader management delegated to navigation methods")
+        
+        // Execute pending completion block if any (e.g. from cleanup() call)
+        // We add a small delay to ensure the UI hierarchy is fully stable for a new presentation
+        if let completion = self.cleanupCompletion {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                completion()
+            }
+            self.cleanupCompletion = nil
+        }
     }
     
     func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {

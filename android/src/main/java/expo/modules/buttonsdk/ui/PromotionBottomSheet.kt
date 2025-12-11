@@ -24,6 +24,9 @@ class PromotionBottomSheet(
 ) {
     
     fun createBottomSheetContent(promotions: List<Pair<String, String>>, container: ViewGroup): View {
+        // Track if already dismissed to prevent multiple calls - DECLARE AT TOP
+        var isDismissed = false
+        
         val rootView = RelativeLayout(context).apply {
             layoutParams = RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT,
@@ -60,6 +63,10 @@ class PromotionBottomSheet(
                 topMargin = (context.resources.displayMetrics.heightPixels * 0.3).toInt()
             }
         }
+        
+        // REMOVE SWIPE FUNCTIONALITY - IT'S CAUSING THE LOOP
+        // Just use backdrop tap to close
+        android.util.Log.d("PromotionBottomSheet", "SWIPE FUNCTIONALITY DISABLED - ONLY BACKDROP TAP")
         
         // Handle bar
         val handleBar = View(context).apply {
@@ -144,9 +151,14 @@ class PromotionBottomSheet(
                 background = rippleDrawable
                 
                 setOnClickListener {
-                    android.util.Log.d("PromotionBottomSheet", "🎯 Promotion selected: $id")
-                    dismissWithAnimation(rootView, container) {
-                        onPromotionClick(id)
+                    if (!isDismissed) {
+                        android.util.Log.d("PromotionBottomSheet", "🎯 Promotion selected: $id")
+                        isDismissed = true
+                        dismissWithAnimation(rootView, container) {
+                            onPromotionClick(id)
+                        }
+                    } else {
+                        android.util.Log.d("PromotionBottomSheet", "ALREADY DISMISSED - IGNORING PROMOTION CLICK")
                     }
                 }
             }
@@ -371,9 +383,14 @@ class PromotionBottomSheet(
                                     .start()
                                 
                                 // Trigger the same action as tapping the deal container
-                                android.util.Log.d("PromotionBottomSheet", "🎯 Promo code clicked for promotion: $id")
-                                dismissWithAnimation(rootView, container) {
-                                    onPromotionClick(id)
+                                if (!isDismissed) {
+                                    android.util.Log.d("PromotionBottomSheet", "🎯 Promo code clicked for promotion: $id")
+                                    isDismissed = true
+                                    dismissWithAnimation(rootView, container) {
+                                        onPromotionClick(id)
+                                    }
+                                } else {
+                                    android.util.Log.d("PromotionBottomSheet", "ALREADY DISMISSED - IGNORING PROMO CODE CLICK")
                                 }
                                 true // Consume the event
                             }
@@ -452,11 +469,23 @@ class PromotionBottomSheet(
         scrollView.addView(promotionListContainer)
         sheetContainer.addView(scrollView)
         
-        // Close on background tap
+        // Close on background tap - BUT ONLY ONCE
         rootView.setOnClickListener {
-            dismissWithAnimation(rootView, container) {
-                onClose()
+            if (!isDismissed) {
+                android.util.Log.d("PromotionBottomSheet", "BACKDROP CLICKED - DISMISSING")
+                isDismissed = true
+                dismissWithAnimation(rootView, container) {
+                    onClose()
+                }
+            } else {
+                android.util.Log.d("PromotionBottomSheet", "ALREADY DISMISSED - IGNORING CLICK")
             }
+        }
+        
+        // Prevent sheet container clicks from bubbling up to rootView
+        sheetContainer.setOnClickListener { 
+            // Consume click to prevent backdrop dismiss
+            android.util.Log.d("PromotionBottomSheet", "SHEET CLICKED - CONSUMING EVENT")
         }
         
         rootView.addView(sheetContainer)
@@ -464,19 +493,39 @@ class PromotionBottomSheet(
     }
     
     private fun dismissWithAnimation(rootView: View, container: ViewGroup, onComplete: () -> Unit) {
-        val sheetChild = (rootView as RelativeLayout).getChildAt(0)
+        android.util.Log.d("PromotionBottomSheet", "DISMISS ANIMATION STARTING")
         
-        // Animate sliding down
-        sheetChild?.animate()
-            ?.translationY(container.height.toFloat())
-            ?.setDuration(250)
-            ?.setInterpolator(android.view.animation.AccelerateInterpolator())
-            ?.withEndAction {
-                // Remove view after animation
-                container.removeView(rootView)
-                onComplete()
+        // IMMEDIATE REMOVAL - NO ANIMATION THAT CAN FAIL
+        try {
+            // Cancel any animations immediately
+            rootView.clearAnimation()
+            rootView.animate().cancel()
+            
+            // Clear all transformations
+            rootView.translationY = 0f
+            rootView.alpha = 1.0f
+            
+            // Remove children first
+            if (rootView is RelativeLayout) {
+                rootView.removeAllViews()
             }
-            ?.start()
+            
+            // Force remove from container
+            container.removeView(rootView)
+            
+            android.util.Log.d("PromotionBottomSheet", "MODAL REMOVED IMMEDIATELY - NO ANIMATION")
+            onComplete()
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionBottomSheet", "FAILED TO REMOVE MODAL", e)
+            // Force remove even if error
+            try {
+                container.removeView(rootView)
+            } catch (e2: Exception) {
+                android.util.Log.e("PromotionBottomSheet", "FAILED SECOND REMOVAL ATTEMPT", e2)
+            }
+            onComplete()
+        }
     }
     
     private fun createHeaderTagIcon(): View {

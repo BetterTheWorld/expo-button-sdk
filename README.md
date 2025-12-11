@@ -97,6 +97,39 @@ clearAllData();
 
 ## Advanced Features
 
+### Picture in Picture (PiP)
+
+Enable Picture-in-Picture mode to keep the browser visible while users navigate your app.
+
+**Note on Android:** Android uses Native PiP, which means the OS controls the window size and position. Custom `size` and `position` props are ignored on Android.
+
+```typescript
+startPurchasePath({
+  url: "https://the.button.url",
+  token: "my-tracking-token",
+  
+  // Basic PiP configuration
+  animationConfig: {
+    pictureInPicture: {
+      enabled: true,
+      
+      // iOS Only: Custom initial position and size
+      position: { x: 20, y: 100 },
+      size: { width: 150, height: 200 }
+    }
+  },
+  
+  // Optional: Add a cover image for the PiP window (iOS only)
+  coverImage: {
+    uri: "https://example.com/logo.png"
+    // OR
+    // source: "local_asset_name"
+    // OR
+    // base64: "..."
+  }
+});
+```
+
 ### Exit Confirmation Dialog
 
 Show a confirmation dialog when users try to leave the purchase path:
