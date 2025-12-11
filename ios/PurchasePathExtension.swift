@@ -71,8 +71,34 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         }
     }
     
+    private var cleanupCompletion: (() -> Void)?
+    
     func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         promotionManager?.setOnPromotionClickCallback(callback)
+    }
+    
+    func cleanup(completion: (() -> Void)? = nil) {
+        // Ensure UI updates are on main thread
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.cleanup(completion: completion)
+            }
+            return
+        }
+        
+        pipManager?.cleanup()
+        pipManager = nil
+        
+        if let browser = currentBrowser {
+            // Store completion block to be called in browserDidClose
+            self.cleanupCompletion = completion
+            browser.dismiss()
+            // Note: browserDidClose will be called by the SDK when dismiss completes
+        } else {
+            // No browser to close, execute completion immediately
+            currentBrowser = nil
+            completion?()
+        }
     }
     
     func closeBrowserIfNeeded(_ browser: BrowserInterface) {
@@ -210,6 +236,15 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         currentBrowser = nil
         
         print("🔄 Browser closed - loader management delegated to navigation methods")
+        
+        // Execute pending completion block if any (e.g. from cleanup() call)
+        // We add a small delay to ensure the UI hierarchy is fully stable for a new presentation
+        if let completion = self.cleanupCompletion {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                completion()
+            }
+            self.cleanupCompletion = nil
+        }
     }
     
     func shouldCloseBrowser(_ browser: BrowserInterface) -> Bool {

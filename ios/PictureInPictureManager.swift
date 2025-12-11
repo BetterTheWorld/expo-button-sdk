@@ -542,23 +542,30 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     }
     
     func cleanup() {
+        // UI updates must be on main thread
+        if Thread.isMainThread {
+            self.performCleanup()
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.performCleanup()
+            }
+        }
+    }
+    
+    private func performCleanup() {
         // Remove from event bus
         BrowserScrollEventBus.shared.removeVisibilityObserver(self)
         
-        // If PiP window exists, restore webview and close window
-        if isMinimized && pipWindow != nil {
-            restoreFromPiP()
+        // Just destroy PiP window without restoring browser state (avoiding unnecessary restore)
+        if pipWindow != nil {
+            pipWindow?.isHidden = true
+            pipWindow?.resignKey()
+            pipWindow = nil
         }
         
-        // Clean up PiP window if still exists
-        pipWindow?.isHidden = true
-        pipWindow?.resignKey()
-        pipWindow = nil
-        
-        // Restore browser if it was minimized
+        // Reset browser view alpha if we still have reference, just in case
         if let browserVC = originalBrowserViewController {
-            browserVC.view.alpha = 1
-            browserVC.view.isUserInteractionEnabled = true
+            browserVC.view.alpha = 1.0
         }
         
         originalBrowserViewController = nil

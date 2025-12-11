@@ -74,56 +74,70 @@ public class ExpoButtonSdkModule: Module {
                 return
             }
             
-            guard let urlString = options["url"] as? String,
-                  let url = URL(string: urlString) else {
-                promise.reject("InvalidURL", "The URL provided is invalid.")
-                return
-            }
-            
-#if DEBUG
-            print("expo-button-sdk startPurchasePath: url: \(url)")
-#endif
+            // Define the start logic as a closure to be called after cleanup
+            let startNewPath = {
+                DispatchQueue.main.async {
+                    guard let urlString = options["url"] as? String,
+                          let url = URL(string: urlString) else {
+                        promise.reject("InvalidURL", "The URL provided is invalid.")
+                        return
+                    }
+                    
+        #if DEBUG
+                    print("expo-button-sdk startPurchasePath: url: \(url)")
+        #endif
 
-            let purchasePathExtension = PurchasePathExtensionCustom(options: options)
-            
-            // Store reference for potential cleanup
-            self.currentPurchasePathExtension = purchasePathExtension
-            
-            // Set up promotion click callback with immediate browser dismiss
-            purchasePathExtension.setPromotionClickCallback { [weak self] promotionId, browser in
+                    let purchasePathExtension = PurchasePathExtensionCustom(options: options)
+                    
+                    // Store reference for potential cleanup
+                    self.currentPurchasePathExtension = purchasePathExtension
+                    
+                    // Set up promotion click callback with immediate browser dismiss
+                    purchasePathExtension.setPromotionClickCallback { [weak self] promotionId, browser in
 
-                // Close browser immediately if needed
-                if purchasePathExtension.closeOnPromotionClick {
-                    browser?.dismiss()
-                } else {
-                    // Don't hide loader here - let navigation methods handle it
-                    print("🔄 Loader management delegated to navigation methods (closeOnPromotionClick=false)")
+                        // Close browser immediately if needed
+                        if purchasePathExtension.closeOnPromotionClick {
+                            browser?.dismiss()
+                        } else {
+                            // Don't hide loader here - let navigation methods handle it
+                            print("🔄 Loader management delegated to navigation methods (closeOnPromotionClick=false)")
+                        }
+
+                        // Send event to JavaScript
+                        self?.sendEvent("onPromotionClick", [
+                            "promotionId": promotionId,
+                            "closeOnPromotionClick": purchasePathExtension.closeOnPromotionClick
+                        ])
+                    }
+                    
+                    Button.purchasePath.extension = purchasePathExtension
+                    let request = PurchasePathRequest(url: url)
+                    
+                    if let token = options["token"] as? String {
+        #if DEBUG
+                        print("expo-button-sdk startPurchasePath: token: \(token)")
+        #endif
+                        request.pubRef = token
+                    }
+                    
+                    Button.purchasePath.fetch(request: request) { purchasePath, error in
+                        if let error = error {
+                            promise.reject("FetchError", error.localizedDescription)
+                        } else if let purchasePath = purchasePath {
+                            purchasePath.start()
+                            promise.resolve(nil)
+                        }
+                    }
                 }
+            }
 
-                // Send event to JavaScript
-                self?.sendEvent("onPromotionClick", [
-                    "promotionId": promotionId,
-                    "closeOnPromotionClick": purchasePathExtension.closeOnPromotionClick
-                ])
-            }
-            
-            Button.purchasePath.extension = purchasePathExtension
-            let request = PurchasePathRequest(url: url)
-            
-            if let token = options["token"] as? String {
-#if DEBUG
-                print("expo-button-sdk startPurchasePath: token: \(token)")
-#endif
-                request.pubRef = token
-            }
-            
-            Button.purchasePath.fetch(request: request) { purchasePath, error in
-                if let error = error {
-                    promise.reject("FetchError", error.localizedDescription)
-                } else if let purchasePath = purchasePath {
-                    purchasePath.start()
-                    promise.resolve(nil)
-                }
+            // Cleanup existing purchase path if any (closes PiP and Browser)
+            if let existingExtension = self.currentPurchasePathExtension {
+                print("expo-button-sdk: Cleaning up existing extension before starting new one")
+                existingExtension.cleanup(completion: startNewPath)
+            } else {
+                // No existing extension, start immediately
+                startNewPath()
             }
         }
         
