@@ -19,37 +19,62 @@ const withButtonConfig: ConfigPlugin<ButtonConfigPluginProps> = (
     const mainApplication = config?.modResults?.manifest?.application?.[0];
 
     // Define the meta-data element for Button SDK App ID
+    const metaDataName = 'com.usebutton.sdk.ApplicationId';
     const metaDataElement = {
       $: {
-        'android:name': 'com.usebutton.sdk.ApplicationId',
+        'android:name': metaDataName,
         'android:value': androidAppId,
       },
     };
 
     // Add the meta-data element if it doesn't already exist
-    if (mainApplication && !mainApplication?.['meta-data']) {
-      mainApplication['meta-data'] = [];
+    if (mainApplication) {
+      if (!mainApplication['meta-data']) {
+        mainApplication['meta-data'] = [];
+      }
+      
+      // Check if it already exists to avoid duplicates
+      const existingMeta = mainApplication['meta-data'].find(
+        (item: any) => item.$['android:name'] === metaDataName
+      );
+      
+      if (!existingMeta) {
+        mainApplication['meta-data'].push(metaDataElement);
+      } else {
+        // Update existing value just in case
+        existingMeta.$['android:value'] = androidAppId;
+      }
     }
-    mainApplication?.['meta-data']?.push(metaDataElement);
 
     // Enable Picture-in-Picture support for the main activity
-    const mainActivity = mainApplication?.activity?.find(
-      (activity) => activity.$["android:name"] === ".MainActivity"
-    );
+    // We find the main activity by looking for the LAUNCHER category in intent-filters
+    // This is more robust than looking for ".MainActivity"
+    const mainActivity = mainApplication?.activity?.find((activity: any) => {
+      const intentFilters = activity['intent-filter'] || [];
+      return intentFilters.some((filter: any) => {
+        const categories = filter.category || [];
+        return categories.some((category: any) => 
+          category.$['android:name'] === 'android.intent.category.LAUNCHER'
+        );
+      });
+    });
+
     if (mainActivity) {
       mainActivity.$["android:supportsPictureInPicture"] = "true";
+      
       // Ensure configuration changes are handled to prevent activity restart on PiP
-      // Adding 'smallestScreenSize|screenLayout|screenSize' is recommended for PiP
       const existingConfigChanges = mainActivity.$["android:configChanges"] || "";
       const requiredChanges = ["smallestScreenSize", "screenLayout", "screenSize", "orientation"];
-      const newConfigChanges = requiredChanges
-        .filter((change) => !existingConfigChanges.includes(change))
-        .join("|");
       
-      if (newConfigChanges) {
+      // Filter out changes that are already present
+      const changesToAdd = requiredChanges.filter(change => 
+        !existingConfigChanges.includes(change)
+      );
+      
+      if (changesToAdd.length > 0) {
         mainActivity.$["android:configChanges"] = existingConfigChanges 
-          ? `${existingConfigChanges}|${newConfigChanges}`
-          : newConfigChanges;
+          ? `${existingConfigChanges}|${changesToAdd.join("|")}`
+          : changesToAdd.join("|");
       }
     }
 
