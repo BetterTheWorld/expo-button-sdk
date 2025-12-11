@@ -50,6 +50,12 @@ export interface AnimationConfig {
   pictureInPicture?: PictureInPictureConfig;
 }
 
+export interface CoverImageConfig {
+  uri?: string;
+  source?: string; // For local assets in iOS bundle
+  base64?: string;
+}
+
 export interface StartPurchasePathOptions {
   url: string;
   token: string;
@@ -74,6 +80,7 @@ export interface StartPurchasePathOptions {
   promotionListTitle?: string;
   promotionBadgeFontSize?: number;
   animationConfig?: AnimationConfig;
+  coverImage?: CoverImageConfig;
 }
 
 export type Identifier = string;
