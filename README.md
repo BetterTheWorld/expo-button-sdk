@@ -108,27 +108,51 @@ startPurchasePath({
   url: "https://the.button.url",
   token: "my-tracking-token",
   
-  // Basic PiP configuration
   animationConfig: {
     pictureInPicture: {
       enabled: true,
       
       // iOS Only: Custom initial position and size
       position: { x: 20, y: 100 },
-      size: { width: 150, height: 200 }
+      size: { width: 150, height: 200 },
+      
+      // Chevron color (iOS & Android)
+      chevronColor: "#FFFFFF",
+      
+      // Earn label overlay on minimized PiP (iOS & Android)
+      earnText: "Earn 2%",
+      earnTextColor: "#FFFFFF",
+      earnTextBackgroundColor: "#99000000"
     }
   },
   
-  // Optional: Add a cover image for the PiP window (iOS only)
+  // Optional: Cover image for the minimized PiP window (iOS & Android)
   coverImage: {
     uri: "https://example.com/logo.png"
     // OR
-    // source: "local_asset_name"
+    // source: "local_asset_name" (iOS only)
     // OR
-    // base64: "..."
+    // base64: "..." (iOS only)
   }
 });
 ```
+
+#### PiP Options
+
+| Option | Platform | Description |
+|--------|----------|-------------|
+| `enabled` | iOS & Android | Enable PiP mode |
+| `position` | iOS only | Initial position `{ x, y }` |
+| `size` | iOS only | Initial size `{ width, height }` |
+| `chevronColor` | iOS & Android | Color of the minimize/maximize chevron |
+| `earnText` | iOS & Android | Text displayed on minimized PiP overlay |
+| `earnTextColor` | iOS & Android | Color of earn text |
+| `earnTextBackgroundColor` | iOS & Android | Background color of earn text label |
+
+#### Platform Differences
+
+- **iOS**: Custom floating window with cover image, earn label, and chevron overlay. Tap anywhere to restore.
+- **Android**: Native system PiP with cover image and earn label overlay. Uses system controls to restore.
 
 ### Exit Confirmation Dialog
 

@@ -41,6 +41,10 @@ export interface PictureInPictureConfig {
   enabled: boolean;
   position?: PictureInPicturePosition;
   size?: PictureInPictureSize;
+  chevronColor?: string;
+  earnText?: string;
+  earnTextColor?: string;
+  earnTextBackgroundColor?: string;
 }
 
 export interface AnimationConfig {

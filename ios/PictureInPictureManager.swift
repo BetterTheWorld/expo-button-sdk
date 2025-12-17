@@ -12,8 +12,13 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var originalWebView: UIView?
     private var containerView: UIView?
     private var isButtonHidden: Bool = false
+    private var chevronColor: UIColor = .white
+    private var earnText: String?
+    private var earnTextColor: UIColor = .white
+    private var earnTextBackgroundColor: UIColor = UIColor.black.withAlphaComponent(0.6)
+    private var earnLabel: UILabel?
+    private var chevronUpView: UIView?
     
-    // Drag & Drop properties
     private var isDragging: Bool = false
     private var dragStartLocation: CGPoint = .zero
     private var pipWindowStartFrame: CGRect = .zero
@@ -23,6 +28,23 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     
     init(options: [String: Any]) {
         self.options = options
+        super.init()
+        
+        if let animationConfig = options["animationConfig"] as? [String: Any],
+           let pipConfig = animationConfig["pictureInPicture"] as? [String: Any] {
+            if let colorString = pipConfig["chevronColor"] as? String {
+                self.chevronColor = UIColor(hex: colorString) ?? .white
+            }
+            if let text = pipConfig["earnText"] as? String {
+                self.earnText = text
+            }
+            if let textColorString = pipConfig["earnTextColor"] as? String {
+                self.earnTextColor = UIColor(hex: textColorString) ?? .white
+            }
+            if let bgColorString = pipConfig["earnTextBackgroundColor"] as? String {
+                self.earnTextBackgroundColor = UIColor(hex: bgColorString) ?? UIColor.black.withAlphaComponent(0.6)
+            }
+        }
     }
     
     func addMinimizeButton(to browser: BrowserInterface) {
@@ -37,13 +59,35 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         containerView.translatesAutoresizingMaskIntoConstraints = false
         self.containerView = containerView
         
-        // Create minimize button with simple chevron
-        let minimizeButton = UIButton(type: .system)
-        minimizeButton.setTitle("⌄", for: .normal)
-        minimizeButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        minimizeButton.setTitleColor(.white, for: .normal)
+        let minimizeButton = UIButton(type: .custom)
         minimizeButton.translatesAutoresizingMaskIntoConstraints = false
         minimizeButton.addTarget(self, action: #selector(minimizeButtonTapped), for: .touchUpInside)
+        
+        let chevronSize: CGFloat = 12
+        let chevronView = UIView(frame: CGRect(x: 0, y: 0, width: chevronSize, height: chevronSize * 0.5))
+        chevronView.backgroundColor = .clear
+        chevronView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let chevronLayer = CAShapeLayer()
+        let chevronPath = UIBezierPath()
+        chevronPath.move(to: CGPoint(x: 0, y: 0))
+        chevronPath.addLine(to: CGPoint(x: chevronSize / 2, y: chevronSize * 0.4))
+        chevronPath.addLine(to: CGPoint(x: chevronSize, y: 0))
+        chevronLayer.path = chevronPath.cgPath
+        chevronLayer.strokeColor = self.chevronColor.cgColor
+        chevronLayer.fillColor = UIColor.clear.cgColor
+        chevronLayer.lineWidth = 2.5
+        chevronLayer.lineCap = .round
+        chevronLayer.lineJoin = .round
+        chevronView.layer.addSublayer(chevronLayer)
+        
+        minimizeButton.addSubview(chevronView)
+        NSLayoutConstraint.activate([
+            chevronView.centerXAnchor.constraint(equalTo: minimizeButton.centerXAnchor),
+            chevronView.centerYAnchor.constraint(equalTo: minimizeButton.centerYAnchor),
+            chevronView.widthAnchor.constraint(equalToConstant: chevronSize),
+            chevronView.heightAnchor.constraint(equalToConstant: chevronSize * 0.5)
+        ])
         
         // Get existing custom action view (deals button) if any
         let existingView = browser.header.customActionView
@@ -61,31 +105,35 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         ])
         
         if let existingView = existingView {
-            // Layout: [deals button] [minimize button] with spacing
             NSLayoutConstraint.activate([
                 existingView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                 existingView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
                 
                 minimizeButton.leadingAnchor.constraint(equalTo: existingView.trailingAnchor, constant: 12),
                 minimizeButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                minimizeButton.topAnchor.constraint(equalTo: containerView.topAnchor, constant: -6), // Subir el chevron
-                minimizeButton.widthAnchor.constraint(equalToConstant: 30),
+                minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
                 minimizeButton.heightAnchor.constraint(equalToConstant: 30)
             ])
             
-            // Update container width based on content
+            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 30)
+            widthConstraint.priority = .defaultHigh
+            widthConstraint.isActive = true
+            
             containerView.widthAnchor.constraint(equalTo: existingView.widthAnchor, constant: 42).isActive = true
         } else {
-            // Only minimize button
             NSLayoutConstraint.activate([
-                minimizeButton.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-                minimizeButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                minimizeButton.topAnchor.constraint(equalTo: containerView.topAnchor, constant: -6), // Subir el chevron
-                minimizeButton.widthAnchor.constraint(equalToConstant: 30),
-                minimizeButton.heightAnchor.constraint(equalToConstant: 30),
-                
-                containerView.widthAnchor.constraint(equalToConstant: 30)
+                minimizeButton.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+                minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+                minimizeButton.heightAnchor.constraint(equalToConstant: 30)
             ])
+            
+            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 30)
+            widthConstraint.priority = .defaultHigh
+            widthConstraint.isActive = true
+            
+            let containerWidthConstraint = containerView.widthAnchor.constraint(equalToConstant: 30)
+            containerWidthConstraint.priority = .defaultHigh
+            containerWidthConstraint.isActive = true
         }
         
         // Set the container as the new custom action view
@@ -219,7 +267,6 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         snapshot.clipsToBounds = true
         pipVC.view.addSubview(snapshot)
         
-        // Add cover image if provided
         if let coverImageConfig = options["coverImage"] as? [String: Any] {
             setupCoverImage(in: pipVC.view, size: pipSize, config: coverImageConfig)
         }
@@ -252,15 +299,15 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             // Fade out browser simultaneously
             browserVC.view.alpha = 0
         }) { _ in
-            // After animation completes, set up window management
             if let browserWindow = windowScene.windows.first(where: { $0.rootViewController == browserVC || $0.rootViewController?.presentedViewController == browserVC }) {
                 browserWindow.windowLevel = UIWindow.Level.normal - 1
             }
             
-            // Make main window key to enable React Native interaction
             if let mainWindow = windowScene.windows.first(where: { !$0.isEqual(self.pipWindow) && $0.windowLevel == UIWindow.Level.normal }) {
                 mainWindow.makeKeyAndVisible()
             }
+            
+            self.setupPipOverlays(in: pipVC.view, size: pipSize)
             
             self.isMinimized = true
         }
@@ -289,10 +336,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             // Animate snapshot back to full size
             snapshot.frame = CGRect(origin: .zero, size: screenBounds.size)
             
-            // Fade out cover image if present
             if let coverImageView = self.coverImageView {
                 coverImageView.alpha = 0.0
             }
+            self.earnLabel?.alpha = 0.0
+            self.chevronUpView?.alpha = 0.0
             
             // Fade in browser simultaneously
             browserVC.view.alpha = 1.0
@@ -497,25 +545,20 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         imageView.clipsToBounds = true
         imageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
         
-        // Try to load image from different sources
         if let imageUrlString = config["uri"] as? String,
            let imageUrl = URL(string: imageUrlString) {
-            // Load from URL
             loadImageFromURL(imageUrl, into: imageView)
         } else if let imageName = config["source"] as? String {
-            // Load from bundle
             if let bundleImage = UIImage(named: imageName) {
                 imageView.image = bundleImage
             }
         } else if let base64String = config["base64"] as? String {
-            // Load from base64
             if let imageData = Data(base64Encoded: base64String),
                let image = UIImage(data: imageData) {
                 imageView.image = image
             }
         }
         
-        // Add subtle overlay to distinguish from background
         let overlayView = UIView()
         overlayView.frame = imageView.bounds
         overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.05)
@@ -523,9 +566,46 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         
         containerView.addSubview(imageView)
         self.coverImageView = imageView
+    }
+    
+    private func setupPipOverlays(in containerView: UIView, size: CGSize) {
+        let chevronUp = UIView()
+        chevronUp.frame = CGRect(x: size.width - 42, y: 14, width: 20, height: 12)
+        chevronUp.backgroundColor = .clear
+        let chevronUpLayer = CAShapeLayer()
+        let chevronUpPath = UIBezierPath()
+        chevronUpPath.move(to: CGPoint(x: 2, y: 10))
+        chevronUpPath.addLine(to: CGPoint(x: 10, y: 2))
+        chevronUpPath.addLine(to: CGPoint(x: 18, y: 10))
+        chevronUpLayer.path = chevronUpPath.cgPath
+        chevronUpLayer.strokeColor = self.chevronColor.cgColor
+        chevronUpLayer.fillColor = UIColor.clear.cgColor
+        chevronUpLayer.lineWidth = 2.0
+        chevronUpLayer.lineCap = .round
+        chevronUpLayer.lineJoin = .round
+        chevronUp.layer.addSublayer(chevronUpLayer)
+        containerView.addSubview(chevronUp)
+        self.chevronUpView = chevronUp
         
-        // Ensure cover image is on top
-        containerView.bringSubviewToFront(imageView)
+        if let earnText = self.earnText, !earnText.isEmpty {
+            let label = UILabel()
+            label.text = earnText
+            label.textColor = self.earnTextColor
+            label.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+            label.textAlignment = .center
+            label.backgroundColor = self.earnTextBackgroundColor
+            label.layer.cornerRadius = 4
+            label.clipsToBounds = true
+            let labelWidth = earnText.size(withAttributes: [.font: label.font!]).width + 16
+            label.frame = CGRect(
+                x: (size.width - labelWidth) / 2,
+                y: size.height - 28,
+                width: labelWidth,
+                height: 20
+            )
+            containerView.addSubview(label)
+            self.earnLabel = label
+        }
     }
     
     private func loadImageFromURL(_ url: URL, into imageView: UIImageView) {
