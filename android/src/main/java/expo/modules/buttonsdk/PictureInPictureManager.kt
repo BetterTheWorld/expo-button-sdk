@@ -28,6 +28,44 @@ class PictureInPictureManager(
     private var containerView: LinearLayout? = null
     private var isButtonHidden = false
     private var isClosingForNewContent = false
+    private var chevronColor: Int = Color.WHITE
+    private var earnText: String? = null
+    private var earnTextColor: Int = Color.WHITE
+    private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
+    private var coverImageUri: String? = null
+    private var pipOverlayView: View? = null
+    
+    init {
+        val animationConfig = options["animationConfig"] as? Map<String, Any>
+        val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
+        pipConfig?.let { config ->
+            (config["chevronColor"] as? String)?.let { colorString ->
+                try {
+                    chevronColor = Color.parseColor(colorString)
+                } catch (e: Exception) {
+                    Log.w("PictureInPictureManager", "Invalid chevronColor: $colorString")
+                }
+            }
+            earnText = config["earnText"] as? String
+            (config["earnTextColor"] as? String)?.let { colorString ->
+                try {
+                    earnTextColor = Color.parseColor(colorString)
+                } catch (e: Exception) {
+                    Log.w("PictureInPictureManager", "Invalid earnTextColor: $colorString")
+                }
+            }
+            (config["earnTextBackgroundColor"] as? String)?.let { colorString ->
+                try {
+                    earnTextBackgroundColor = Color.parseColor(colorString)
+                } catch (e: Exception) {
+                    Log.w("PictureInPictureManager", "Invalid earnTextBackgroundColor: $colorString")
+                }
+            }
+        }
+        
+        val coverImage = options["coverImage"] as? Map<String, Any>
+        coverImageUri = coverImage?.get("uri") as? String
+    }
     
     var delegate: PictureInPictureManagerDelegate? = null
     
@@ -187,8 +225,7 @@ class PictureInPictureManager(
             setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
-            // Create chevron down drawable
-            val chevronDrawable = createChevronDownDrawable(Color.WHITE)
+            val chevronDrawable = createChevronDownDrawable(chevronColor)
             setImageDrawable(chevronDrawable)
         }
         
@@ -278,17 +315,16 @@ class PictureInPictureManager(
         
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             try {
-                // Create PiP params
                 val pipParamsBuilder = android.app.PictureInPictureParams.Builder()
                 val aspectRatio = android.util.Rational(16, 9)
                 pipParamsBuilder.setAspectRatio(aspectRatio)
                 val pipParams = pipParamsBuilder.build()
                 
-                // Enter Picture-in-Picture mode
                 val success = buttonActivity.enterPictureInPictureMode(pipParams)
                 
                 if (success) {
                     Log.d("PictureInPictureManager", "Successfully entered native PiP mode")
+                    showPipOverlay(buttonActivity)
                 } else {
                     Log.w("PictureInPictureManager", "Failed to enter PiP mode")
                 }
@@ -299,6 +335,145 @@ class PictureInPictureManager(
         } else {
             Log.w("PictureInPictureManager", "Picture-in-Picture not supported on Android < 8.0")
         }
+    }
+    
+    private fun showPipOverlay(activity: Activity) {
+        if (coverImageUri == null && earnText == null) {
+            Log.d("PictureInPictureManager", "No cover image or earn text, skipping overlay")
+            return
+        }
+        
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val rootView = activity.window.decorView.findViewById<android.view.ViewGroup>(android.R.id.content)
+                
+                val overlayContainer = android.widget.FrameLayout(activity).apply {
+                    layoutParams = android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    setBackgroundColor(Color.TRANSPARENT)
+                }
+                
+                if (coverImageUri != null) {
+                    val imageView = ImageView(activity).apply {
+                        layoutParams = android.widget.FrameLayout.LayoutParams(
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    }
+                    loadImageFromUrl(coverImageUri!!, imageView)
+                    overlayContainer.addView(imageView)
+                }
+                
+                val chevronUpView = ImageView(activity).apply {
+                    val size = dpToPx(24)
+                    val margin = dpToPx(12)
+                    layoutParams = android.widget.FrameLayout.LayoutParams(size, size).apply {
+                        gravity = Gravity.TOP or Gravity.END
+                        topMargin = margin
+                        marginEnd = margin
+                    }
+                    setImageDrawable(createChevronUpDrawable(chevronColor))
+                }
+                overlayContainer.addView(chevronUpView)
+                
+                if (!earnText.isNullOrEmpty()) {
+                    val earnLabel = TextView(activity).apply {
+                        text = earnText
+                        setTextColor(earnTextColor)
+                        textSize = 12f
+                        setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+                        
+                        val bgDrawable = android.graphics.drawable.GradientDrawable().apply {
+                            setColor(earnTextBackgroundColor)
+                            cornerRadius = dpToPx(4).toFloat()
+                        }
+                        background = bgDrawable
+                        
+                        layoutParams = android.widget.FrameLayout.LayoutParams(
+                            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                            bottomMargin = dpToPx(16)
+                        }
+                    }
+                    overlayContainer.addView(earnLabel)
+                }
+                
+                rootView.addView(overlayContainer)
+                pipOverlayView = overlayContainer
+                
+                Log.d("PictureInPictureManager", "PiP overlay added successfully")
+                
+            } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error showing PiP overlay", e)
+            }
+        }, 300)
+    }
+    
+    private fun hidePipOverlay() {
+        pipOverlayView?.let { overlay ->
+            try {
+                (overlay.parent as? android.view.ViewGroup)?.removeView(overlay)
+                pipOverlayView = null
+                Log.d("PictureInPictureManager", "PiP overlay removed")
+            } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error removing PiP overlay", e)
+            }
+        }
+    }
+    
+    private fun createChevronUpDrawable(color: Int): Drawable {
+        return object : Drawable() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                style = Paint.Style.STROKE
+                strokeWidth = dpToPx(2).toFloat()
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+
+            override fun draw(canvas: Canvas) {
+                val bounds = getBounds()
+                val centerX = bounds.centerX().toFloat()
+                val centerY = bounds.centerY().toFloat()
+                
+                val size = dpToPx(6).toFloat()
+                val path = Path()
+                
+                path.moveTo(centerX - size, centerY + size/2)
+                path.lineTo(centerX, centerY - size/2)
+                path.lineTo(centerX + size, centerY + size/2)
+                
+                canvas.drawPath(path, paint)
+            }
+
+            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            override fun getIntrinsicWidth(): Int = dpToPx(18)
+            override fun getIntrinsicHeight(): Int = dpToPx(18)
+        }
+    }
+    
+    private fun loadImageFromUrl(url: String, imageView: ImageView) {
+        Thread {
+            try {
+                val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                connection.doInput = true
+                connection.connect()
+                val input = connection.inputStream
+                val bitmap = BitmapFactory.decodeStream(input)
+                Handler(Looper.getMainLooper()).post {
+                    imageView.setImageBitmap(bitmap)
+                }
+            } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error loading image from URL", e)
+            }
+        }.start()
     }
     
     private fun restoreFromPiP() {
@@ -315,6 +490,8 @@ class PictureInPictureManager(
         }
         
         Log.d("PictureInPictureManager", "Exiting PiP mode - Android will automatically restore the activity")
+        
+        hidePipOverlay()
         
         isAnimating = false
         isMinimized = false
@@ -373,6 +550,8 @@ class PictureInPictureManager(
     
     fun cleanup() {
         BrowserScrollEventBus.getInstance().removeVisibilityObserver(this)
+        
+        hidePipOverlay()
         
         originalBrowser = null
         containerView = null
