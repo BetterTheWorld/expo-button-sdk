@@ -16,6 +16,7 @@ import com.usebutton.sdk.purchasepath.BrowserInterface
 import expo.modules.buttonsdk.events.BrowserScrollEventBus
 import expo.modules.buttonsdk.events.ScrollVisibilityObserver
 import expo.modules.buttonsdk.events.ScrollVisibilityEvent
+import java.lang.ref.WeakReference
 
 class PictureInPictureManager(
     private val context: Context,
@@ -34,6 +35,9 @@ class PictureInPictureManager(
     private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
     private var coverImageUri: String? = null
     private var pipOverlayView: View? = null
+    private var currentPipActivity: WeakReference<Activity>? = null
+    private var pipModeChecker: Runnable? = null
+    private val pipModeHandler = Handler(Looper.getMainLooper())
     
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
@@ -76,6 +80,15 @@ class PictureInPictureManager(
     
     fun isPipActive(): Boolean {
         return isMinimized
+    }
+    
+    fun onPictureInPictureModeChanged(isInPipMode: Boolean) {
+        Log.d("PictureInPictureManager", "onPictureInPictureModeChanged: $isInPipMode")
+        if (!isInPipMode && isMinimized) {
+            hidePipOverlay()
+            isMinimized = false
+            delegate?.didRestore()
+        }
     }
     
     fun closePipAndProceed(onComplete: () -> Unit) {
@@ -325,6 +338,7 @@ class PictureInPictureManager(
                 if (success) {
                     Log.d("PictureInPictureManager", "Successfully entered native PiP mode")
                     showPipOverlay(buttonActivity)
+                    startPipModeChecker(buttonActivity)
                 } else {
                     Log.w("PictureInPictureManager", "Failed to enter PiP mode")
                 }
@@ -343,6 +357,8 @@ class PictureInPictureManager(
             return
         }
         
+        currentPipActivity = WeakReference(activity)
+        
         Handler(Looper.getMainLooper()).postDelayed({
             try {
                 val rootView = activity.window.decorView.findViewById<android.view.ViewGroup>(android.R.id.content)
@@ -353,6 +369,8 @@ class PictureInPictureManager(
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                     )
                     setBackgroundColor(Color.TRANSPARENT)
+                    isClickable = false
+                    isFocusable = false
                 }
                 
                 if (coverImageUri != null) {
@@ -366,18 +384,6 @@ class PictureInPictureManager(
                     loadImageFromUrl(coverImageUri!!, imageView)
                     overlayContainer.addView(imageView)
                 }
-                
-                val chevronUpView = ImageView(activity).apply {
-                    val size = dpToPx(24)
-                    val margin = dpToPx(12)
-                    layoutParams = android.widget.FrameLayout.LayoutParams(size, size).apply {
-                        gravity = Gravity.TOP or Gravity.END
-                        topMargin = margin
-                        marginEnd = margin
-                    }
-                    setImageDrawable(createChevronUpDrawable(chevronColor))
-                }
-                overlayContainer.addView(chevronUpView)
                 
                 if (!earnText.isNullOrEmpty()) {
                     val earnLabel = TextView(activity).apply {
@@ -414,7 +420,41 @@ class PictureInPictureManager(
         }, 300)
     }
     
+    private fun startPipModeChecker(activity: Activity) {
+        stopPipModeChecker()
+        
+        pipModeChecker = object : Runnable {
+            override fun run() {
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        if (!activity.isInPictureInPictureMode && isMinimized) {
+                            Log.d("PictureInPictureManager", "Detected exit from PiP mode")
+                            hidePipOverlay()
+                            isMinimized = false
+                            delegate?.didRestore()
+                            stopPipModeChecker()
+                            return
+                        }
+                    }
+                    pipModeHandler.postDelayed(this, 200)
+                } catch (e: Exception) {
+                    Log.e("PictureInPictureManager", "Error in PiP mode checker", e)
+                    stopPipModeChecker()
+                }
+            }
+        }
+        pipModeHandler.postDelayed(pipModeChecker!!, 500)
+    }
+    
+    private fun stopPipModeChecker() {
+        pipModeChecker?.let {
+            pipModeHandler.removeCallbacks(it)
+            pipModeChecker = null
+        }
+    }
+    
     private fun hidePipOverlay() {
+        stopPipModeChecker()
         pipOverlayView?.let { overlay ->
             try {
                 (overlay.parent as? android.view.ViewGroup)?.removeView(overlay)
@@ -423,39 +463,6 @@ class PictureInPictureManager(
             } catch (e: Exception) {
                 Log.e("PictureInPictureManager", "Error removing PiP overlay", e)
             }
-        }
-    }
-    
-    private fun createChevronUpDrawable(color: Int): Drawable {
-        return object : Drawable() {
-            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                style = Paint.Style.STROKE
-                strokeWidth = dpToPx(2).toFloat()
-                strokeCap = Paint.Cap.ROUND
-                strokeJoin = Paint.Join.ROUND
-            }
-
-            override fun draw(canvas: Canvas) {
-                val bounds = getBounds()
-                val centerX = bounds.centerX().toFloat()
-                val centerY = bounds.centerY().toFloat()
-                
-                val size = dpToPx(6).toFloat()
-                val path = Path()
-                
-                path.moveTo(centerX - size, centerY + size/2)
-                path.lineTo(centerX, centerY - size/2)
-                path.lineTo(centerX + size, centerY + size/2)
-                
-                canvas.drawPath(path, paint)
-            }
-
-            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
-            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
-            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
-            override fun getIntrinsicWidth(): Int = dpToPx(18)
-            override fun getIntrinsicHeight(): Int = dpToPx(18)
         }
     }
     
@@ -551,6 +558,7 @@ class PictureInPictureManager(
     fun cleanup() {
         BrowserScrollEventBus.getInstance().removeVisibilityObserver(this)
         
+        stopPipModeChecker()
         hidePipOverlay()
         
         originalBrowser = null
