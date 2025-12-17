@@ -177,6 +177,7 @@ export function Example() {
                   enabled: true,
                   position: { x: 50, y: 100 },
                   size: { width: 180, height: 120 }, // Rectangular like YouTube
+                  earnText: "Earn 2%",
                 },
               },
               coverImage: {
@@ -257,6 +258,7 @@ export function Example() {
                   enabled: true,
                   position: { x: 20, y: 200 },
                   size: { width: 300, height: 450 },
+                  earnText: "Earn 2%",
                 },
               },
             });
