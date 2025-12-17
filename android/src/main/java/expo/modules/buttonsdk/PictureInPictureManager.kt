@@ -186,44 +186,25 @@ class PictureInPictureManager(
     fun createMinimizeButton(context: Context, browser: BrowserInterface? = null): View {
         Log.d("PictureInPictureManager", "createMinimizeButton called")
         
-        // Create the same type of button container as the promotions button
         val button = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
             
-            // Increase padding for better touch area
-            setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
             
-            // Create background similar to promotion button
-            val pillBackground = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                setColor(Color.parseColor("#44666666")) // Dark semi-transparent background
-                cornerRadius = dpToPx(10).toFloat()
-            }
-            
-            val rippleDrawable = android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(Color.parseColor("#20FFFFFF")),
-                pillBackground,
-                null
-            )
-            background = rippleDrawable
+            background = null
             
             isClickable = true
             isFocusable = true
             
             setOnClickListener { 
                 Log.d("PictureInPictureManager", "Minimize button clicked!")
-                Log.d("PictureInPictureManager", "originalBrowser is: ${if (originalBrowser != null) "not null" else "null"}")
-                Log.d("PictureInPictureManager", "passed browser is: ${if (browser != null) "not null" else "null"}")
                 
-                // Use the passed browser or fallback to originalBrowser
                 val browserToUse = browser ?: originalBrowser
                 if (browserToUse != null) {
-                    // Store it for future use
                     originalBrowser = browserToUse
                 }
                 
-                // Call minimize immediately, remove animation that might interfere
                 minimizeButtonTapped() 
             }
         }
@@ -510,7 +491,7 @@ class PictureInPictureManager(
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = color
                 style = Paint.Style.STROKE
-                strokeWidth = dpToPx(2).toFloat() // Good visibility
+                strokeWidth = dpToPx(2).toFloat()
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
@@ -520,34 +501,21 @@ class PictureInPictureManager(
                 val centerX = bounds.centerX().toFloat()
                 val centerY = bounds.centerY().toFloat()
                 
-                // Draw chevron down (V shape) - bigger for visibility and touch
-                val size = dpToPx(7).toFloat() // Bigger chevron for better visibility
+                val size = dpToPx(5).toFloat()
                 val path = Path()
                 
-                // Start from top-left point
-                path.moveTo(centerX - size, centerY - size/2)
-                // Draw to bottom point
-                path.lineTo(centerX, centerY + size/2)
-                // Draw to top-right point
-                path.lineTo(centerX + size, centerY - size/2)
+                path.moveTo(centerX - size, centerY - size * 0.4f)
+                path.lineTo(centerX, centerY + size * 0.4f)
+                path.lineTo(centerX + size, centerY - size * 0.4f)
                 
                 canvas.drawPath(path, paint)
             }
 
-            override fun setAlpha(alpha: Int) {
-                paint.alpha = alpha
-            }
-
-            override fun setColorFilter(colorFilter: ColorFilter?) {
-                paint.colorFilter = colorFilter
-            }
-
-            override fun getOpacity(): Int {
-                return PixelFormat.TRANSLUCENT
-            }
-
-            override fun getIntrinsicWidth(): Int = dpToPx(18)
-            override fun getIntrinsicHeight(): Int = dpToPx(18)
+            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            override fun getIntrinsicWidth(): Int = dpToPx(16)
+            override fun getIntrinsicHeight(): Int = dpToPx(16)
         }
     }
 
