@@ -41,6 +41,7 @@ class PictureInPictureManager(
     private val pipModeHandler = Handler(Looper.getMainLooper())
     private var isPipHidden = false
     private var pipTaskId: Int = -1
+    private var isRestoringPip = false
     
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
@@ -118,6 +119,7 @@ class PictureInPictureManager(
             
             try {
                 if (pipTaskId != -1) {
+                    isRestoringPip = true
                     val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                     activityManager.moveTaskToFront(pipTaskId, 0)
                     
@@ -131,12 +133,14 @@ class PictureInPictureManager(
                                 Log.d("PictureInPictureManager", "Re-entered PiP mode")
                             }
                         }
+                        isRestoringPip = false
                     }, 100)
                     
                     isPipHidden = false
                     Log.d("PictureInPictureManager", "PiP shown via moveTaskToFront")
                 }
             } catch (e: Exception) {
+                isRestoringPip = false
                 Log.e("PictureInPictureManager", "Error showing PiP", e)
             }
         }
@@ -468,7 +472,7 @@ class PictureInPictureManager(
             override fun run() {
                 try {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        if (!activity.isInPictureInPictureMode && isMinimized && !isPipHidden) {
+                        if (!activity.isInPictureInPictureMode && isMinimized && !isPipHidden && !isRestoringPip) {
                             Log.d("PictureInPictureManager", "Detected exit from PiP mode")
                             hidePipOverlay()
                             isMinimized = false
