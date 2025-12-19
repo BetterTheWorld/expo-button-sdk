@@ -40,6 +40,16 @@ class ExpoButtonSdkModule() : Module() {
       Log.d("ButtonSdk", "clearAllData")
       Button.clearAllData()
     }
+    
+    Function("hidePip") {
+      Log.d("ButtonSdk", "hidePip")
+      currentPictureInPictureManager?.hidePip()
+    }
+    
+    Function("showPip") {
+      Log.d("ButtonSdk", "showPip")
+      currentPictureInPictureManager?.showPip()
+    }
 
     AsyncFunction("startPurchasePath") { params: Map<String, Any>, promise: Promise ->
       val url = params["url"] as? String ?: ""

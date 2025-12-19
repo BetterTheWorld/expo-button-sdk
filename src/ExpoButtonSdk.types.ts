@@ -56,8 +56,9 @@ export interface AnimationConfig {
 
 export interface CoverImageConfig {
   uri?: string;
-  source?: string; // For local assets in iOS bundle
+  source?: string;
   base64?: string;
+  scaleType?: 'cover' | 'contain' | 'center' | 'stretch';
 }
 
 export interface StartPurchasePathOptions {
