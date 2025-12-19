@@ -120,6 +120,10 @@ class PictureInPictureManager(
             try {
                 if (pipTaskId != -1) {
                     isRestoringPip = true
+                    
+                    pipOverlayView?.alpha = 0f
+                    currentPipActivity?.get()?.window?.decorView?.alpha = 0f
+                    
                     val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                     activityManager.moveTaskToFront(pipTaskId, 0)
                     
@@ -131,6 +135,11 @@ class PictureInPictureManager(
                                     .build()
                                 activity.enterPictureInPictureMode(pipParams)
                                 Log.d("PictureInPictureManager", "Re-entered PiP mode")
+                                
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    activity.window?.decorView?.animate()?.alpha(1f)?.setDuration(150)?.start()
+                                    pipOverlayView?.animate()?.alpha(1f)?.setDuration(150)?.start()
+                                }, 50)
                             }
                         }
                         isRestoringPip = false
@@ -156,32 +165,41 @@ class PictureInPictureManager(
     }
     
     fun closePipAndProceed(onComplete: () -> Unit) {
-        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback")
+        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback, isMinimized: $isMinimized, isPipHidden: $isPipHidden")
         
-        if (!isMinimized) {
+        if (!isMinimized && !isPipHidden) {
             Log.d("PictureInPictureManager", "PiP not active, proceeding immediately")
             onComplete()
             return
         }
         
-        // Set flag to bypass exit confirmation
+        if (isPipHidden) {
+            Log.d("PictureInPictureManager", "PiP is hidden, cleaning up and proceeding")
+            Handler(Looper.getMainLooper()).post {
+                hidePipOverlay()
+                isMinimized = false
+                isPipHidden = false
+                isRestoringPip = false
+                pipTaskId = -1
+                onComplete()
+            }
+            return
+        }
+        
         isClosingForNewContent = true
         
-        // Set callback for when PiP is closed
         delegate = object : PictureInPictureManagerDelegate {
             override fun didMinimize() {
-                // Not needed
             }
             
             override fun didRestore() {
                 Log.d("PictureInPictureManager", "PiP closed, executing callback")
                 isClosingForNewContent = false
                 onComplete()
-                delegate = null // Clean up
+                delegate = null
             }
         }
         
-        // Close PiP
         exitPipForNewContent()
     }
     
