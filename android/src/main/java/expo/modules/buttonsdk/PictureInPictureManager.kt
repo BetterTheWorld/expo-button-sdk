@@ -120,6 +120,19 @@ class PictureInPictureManager(
                 if (pipTaskId != -1) {
                     val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                     activityManager.moveTaskToFront(pipTaskId, 0)
+                    
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        currentPipActivity?.get()?.let { activity ->
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                val pipParams = android.app.PictureInPictureParams.Builder()
+                                    .setAspectRatio(android.util.Rational(16, 9))
+                                    .build()
+                                activity.enterPictureInPictureMode(pipParams)
+                                Log.d("PictureInPictureManager", "Re-entered PiP mode")
+                            }
+                        }
+                    }, 100)
+                    
                     isPipHidden = false
                     Log.d("PictureInPictureManager", "PiP shown via moveTaskToFront")
                 }
