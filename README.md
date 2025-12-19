@@ -154,6 +154,32 @@ startPurchasePath({
 - **iOS**: Custom floating window with cover image, earn label, and chevron overlay. Tap anywhere to restore.
 - **Android**: Native system PiP with cover image and earn label overlay. Uses system controls to restore.
 
+#### Programmatic PiP Control
+
+You can programmatically hide and show the PiP window. This is useful when you want to temporarily hide the PiP (e.g., during checkout flows or when displaying important content).
+
+```typescript
+import { hidePip, showPip } from "@flipgive/expo-button-sdk";
+
+// Hide the PiP window (moves it off-screen on iOS, moves task to back on Android)
+hidePip();
+
+// Show the PiP window again
+showPip();
+```
+
+**Platform Behavior:**
+
+| Method | iOS | Android |
+|--------|-----|---------|
+| `hidePip()` | Moves PiP window off-screen instantly | Moves PiP task to background |
+| `showPip()` | Restores PiP window to last position | Brings PiP task to front and re-enters PiP mode |
+
+**Notes:**
+- These functions only work when PiP mode is active (`isMinimized = true`)
+- On Android, `showPip()` briefly shows the activity in fullscreen before re-entering PiP mode
+- Starting a new purchase path while PiP is hidden will automatically clean up the hidden PiP state
+
 ### Exit Confirmation Dialog
 
 Show a confirmation dialog when users try to leave the purchase path:
