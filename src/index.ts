@@ -117,3 +117,11 @@ export function closePurchasePath() {
   return ExpoButtonSdkModule.closePurchasePath();
 }
 
+export function hidePip() {
+  return ExpoButtonSdkModule.hidePip();
+}
+
+export function showPip() {
+  return ExpoButtonSdkModule.showPip();
+}
+

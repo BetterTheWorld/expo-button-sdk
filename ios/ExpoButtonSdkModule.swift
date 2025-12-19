@@ -40,6 +40,14 @@ public class ExpoButtonSdkModule: Module {
             // No longer needed - handled by native button
         }
         
+        Function("hidePip") {
+            currentPurchasePathExtension?.hidePip()
+        }
+        
+        Function("showPip") {
+            currentPurchasePathExtension?.showPip()
+        }
+        
         AsyncFunction("initializeSDK") { (promise: Promise) in
             if ButtonSDKDelegate.isConfigured {
                 promise.resolve(true)

@@ -3,6 +3,8 @@ import {
   clearAllData,
   setIdentifier,
   initializeSDK,
+  hidePip,
+  showPip,
 } from "@flipgive/expo-button-sdk";
 import { MOCK_PROMOTION_DATA } from "../../src/constants/MockData";
 import React, { useEffect, useState } from "react";
@@ -13,11 +15,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
 
 export function Example() {
   const [isSDKInitialized, setIsSDKInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPipHidden, setIsPipHidden] = useState(false);
 
   console.info("isSDKInitialized", isSDKInitialized);
 
@@ -182,6 +186,7 @@ export function Example() {
               },
               coverImage: {
                 uri: "https://placecats.com/millie_neo/300/200",
+                scaleType: "stretch",
                 // Alternative options:
                 // source: "my-local-image"  // from app bundle
                 // base64: "iVBORw0KGgoAAAANSUhEUgA..." // base64 string
@@ -264,6 +269,72 @@ export function Example() {
             });
           }}
         />
+        <Button
+          title="Open Browser with PIP Controls"
+          onPress={() => {
+            if (
+              !process.env.EXPO_PUBLIC_BUTON_SDK_URL_EXAMPLE ||
+              !process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE
+            ) {
+              return;
+            }
+
+            startPurchasePath({
+              footerBackgroundColor: "#FF3453",
+              footerTintColor: "#FF3453",
+              headerBackgroundColor: "#FF3453",
+              headerSubtitle: "Gives 5%",
+              headerSubtitleColor: "#FFE599",
+              headerTintColor: "#FFFFFF",
+              headerTitle: "Nike Store",
+              headerTitleColor: "#FFFFFF",
+              url: "https://www.nike.com",
+              token: process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE,
+              animationConfig: {
+                pictureInPicture: {
+                  enabled: true,
+                  chevronColor: "#FFFFFF",
+                  earnText: "Earn 5% cashback",
+                  earnTextColor: "#FFFFFF",
+                  earnTextBackgroundColor: "#FF3453",
+                },
+              },
+              coverImage: {
+                uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
+                scaleType: "cover",
+              },
+            });
+          }}
+        />
+        <View style={styles.pipControlsContainer}>
+          <Text style={styles.pipControlsTitle}>PIP Controls:</Text>
+          <View style={styles.pipButtonsRow}>
+            <Button
+              title={isPipHidden ? "Show PIP" : "Hide PIP"}
+              onPress={() => {
+                if (isPipHidden) {
+                  showPip();
+                  setIsPipHidden(false);
+                } else {
+                  hidePip();
+                  setIsPipHidden(true);
+                }
+              }}
+            />
+            <Button
+              title="Toggle PIP"
+              onPress={() => {
+                if (isPipHidden) {
+                  showPip();
+                  setIsPipHidden(false);
+                } else {
+                  hidePip();
+                  setIsPipHidden(true);
+                }
+              }}
+            />
+          </View>
+        </View>
         <Button title="Clear Data" onPress={clearAllData} />
         <Button
           title="Sing in user"
@@ -285,6 +356,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
+  },
+  pipControlsContainer: {
+    marginVertical: 10,
+    padding: 15,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    width: "90%",
+  },
+  pipControlsTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  pipButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     gap: 10,
   },
 });

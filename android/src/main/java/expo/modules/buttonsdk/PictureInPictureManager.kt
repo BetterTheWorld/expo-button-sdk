@@ -34,10 +34,14 @@ class PictureInPictureManager(
     private var earnTextColor: Int = Color.WHITE
     private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
     private var coverImageUri: String? = null
+    private var coverImageScaleType: ImageView.ScaleType = ImageView.ScaleType.CENTER_CROP
     private var pipOverlayView: View? = null
     private var currentPipActivity: WeakReference<Activity>? = null
     private var pipModeChecker: Runnable? = null
     private val pipModeHandler = Handler(Looper.getMainLooper())
+    private var isPipHidden = false
+    private var pipTaskId: Int = -1
+    private var isRestoringPip = false
     
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
@@ -69,6 +73,15 @@ class PictureInPictureManager(
         
         val coverImage = options["coverImage"] as? Map<String, Any>
         coverImageUri = coverImage?.get("uri") as? String
+        (coverImage?.get("scaleType") as? String)?.let { scaleTypeString ->
+            coverImageScaleType = when (scaleTypeString.lowercase()) {
+                "contain" -> ImageView.ScaleType.FIT_CENTER
+                "cover" -> ImageView.ScaleType.CENTER_CROP
+                "center" -> ImageView.ScaleType.CENTER_INSIDE
+                "stretch" -> ImageView.ScaleType.FIT_XY
+                else -> ImageView.ScaleType.CENTER_CROP
+            }
+        }
     }
     
     var delegate: PictureInPictureManagerDelegate? = null
@@ -82,6 +95,66 @@ class PictureInPictureManager(
         return isMinimized
     }
     
+    fun hidePip() {
+        Handler(Looper.getMainLooper()).post {
+            if (!isMinimized || isPipHidden) return@post
+            
+            currentPipActivity?.get()?.let { activity ->
+                try {
+                    pipTaskId = activity.taskId
+                    activity.moveTaskToBack(true)
+                    isPipHidden = true
+                    Log.d("PictureInPictureManager", "PiP hidden, taskId: $pipTaskId")
+                } catch (e: Exception) {
+                    Log.e("PictureInPictureManager", "Error hiding PiP", e)
+                }
+            }
+        }
+    }
+    
+    fun showPip() {
+        Handler(Looper.getMainLooper()).post {
+            Log.d("PictureInPictureManager", "showPip called - isMinimized: $isMinimized, isPipHidden: $isPipHidden, taskId: $pipTaskId")
+            if (!isMinimized || !isPipHidden) return@post
+            
+            try {
+                if (pipTaskId != -1) {
+                    isRestoringPip = true
+                    
+                    pipOverlayView?.alpha = 0f
+                    currentPipActivity?.get()?.window?.decorView?.alpha = 0f
+                    
+                    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    activityManager.moveTaskToFront(pipTaskId, 0)
+                    
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        currentPipActivity?.get()?.let { activity ->
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                val pipParams = android.app.PictureInPictureParams.Builder()
+                                    .setAspectRatio(android.util.Rational(16, 9))
+                                    .build()
+                                activity.enterPictureInPictureMode(pipParams)
+                                Log.d("PictureInPictureManager", "Re-entered PiP mode")
+                                
+                                Handler(Looper.getMainLooper()).postDelayed({
+                                    activity.window?.decorView?.animate()?.alpha(1f)?.setDuration(150)?.start()
+                                    pipOverlayView?.animate()?.alpha(1f)?.setDuration(150)?.start()
+                                }, 50)
+                            }
+                        }
+                        isRestoringPip = false
+                    }, 100)
+                    
+                    isPipHidden = false
+                    Log.d("PictureInPictureManager", "PiP shown via moveTaskToFront")
+                }
+            } catch (e: Exception) {
+                isRestoringPip = false
+                Log.e("PictureInPictureManager", "Error showing PiP", e)
+            }
+        }
+    }
+    
     fun onPictureInPictureModeChanged(isInPipMode: Boolean) {
         Log.d("PictureInPictureManager", "onPictureInPictureModeChanged: $isInPipMode")
         if (!isInPipMode && isMinimized) {
@@ -92,32 +165,41 @@ class PictureInPictureManager(
     }
     
     fun closePipAndProceed(onComplete: () -> Unit) {
-        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback")
+        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback, isMinimized: $isMinimized, isPipHidden: $isPipHidden")
         
-        if (!isMinimized) {
+        if (!isMinimized && !isPipHidden) {
             Log.d("PictureInPictureManager", "PiP not active, proceeding immediately")
             onComplete()
             return
         }
         
-        // Set flag to bypass exit confirmation
+        if (isPipHidden) {
+            Log.d("PictureInPictureManager", "PiP is hidden, cleaning up and proceeding")
+            Handler(Looper.getMainLooper()).post {
+                hidePipOverlay()
+                isMinimized = false
+                isPipHidden = false
+                isRestoringPip = false
+                pipTaskId = -1
+                onComplete()
+            }
+            return
+        }
+        
         isClosingForNewContent = true
         
-        // Set callback for when PiP is closed
         delegate = object : PictureInPictureManagerDelegate {
             override fun didMinimize() {
-                // Not needed
             }
             
             override fun didRestore() {
                 Log.d("PictureInPictureManager", "PiP closed, executing callback")
                 isClosingForNewContent = false
                 onComplete()
-                delegate = null // Clean up
+                delegate = null
             }
         }
         
-        // Close PiP
         exitPipForNewContent()
     }
     
@@ -211,7 +293,7 @@ class PictureInPictureManager(
         
         // Create the chevron icon
         val chevronIcon = ImageView(context).apply {
-            val iconSize = dpToPx(24) // Larger icon for better visibility
+            val iconSize = dpToPx(28)
             layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
@@ -219,7 +301,7 @@ class PictureInPictureManager(
             setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             
-            val chevronDrawable = createChevronDownDrawable(chevronColor)
+            val chevronDrawable = createChevronDownDrawableForHeader(chevronColor)
             setImageDrawable(chevronDrawable)
         }
         
@@ -360,7 +442,7 @@ class PictureInPictureManager(
                             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                             android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                         )
-                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        scaleType = coverImageScaleType
                     }
                     loadImageFromUrl(coverImageUri!!, imageView)
                     overlayContainer.addView(imageView)
@@ -408,7 +490,7 @@ class PictureInPictureManager(
             override fun run() {
                 try {
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        if (!activity.isInPictureInPictureMode && isMinimized) {
+                        if (!activity.isInPictureInPictureMode && isMinimized && !isPipHidden && !isRestoringPip) {
                             Log.d("PictureInPictureManager", "Detected exit from PiP mode")
                             hidePipOverlay()
                             isMinimized = false
@@ -486,6 +568,39 @@ class PictureInPictureManager(
         delegate?.didRestore()
     }
     
+    private fun createChevronDownDrawableForHeader(color: Int): Drawable {
+        return object : Drawable() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                style = Paint.Style.STROKE
+                strokeWidth = dpToPx(3).toFloat()
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+            }
+
+            override fun draw(canvas: Canvas) {
+                val bounds = getBounds()
+                val centerX = bounds.centerX().toFloat()
+                val centerY = bounds.centerY().toFloat()
+                
+                val size = dpToPx(7).toFloat()
+                val path = Path()
+                
+                path.moveTo(centerX - size, centerY - size * 0.4f)
+                path.lineTo(centerX, centerY + size * 0.4f)
+                path.lineTo(centerX + size, centerY - size * 0.4f)
+                
+                canvas.drawPath(path, paint)
+            }
+
+            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+            override fun setColorFilter(colorFilter: ColorFilter?) { paint.colorFilter = colorFilter }
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            override fun getIntrinsicWidth(): Int = dpToPx(20)
+            override fun getIntrinsicHeight(): Int = dpToPx(20)
+        }
+    }
+    
     private fun createChevronDownDrawable(color: Int): Drawable {
         return object : Drawable() {
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -501,7 +616,7 @@ class PictureInPictureManager(
                 val centerX = bounds.centerX().toFloat()
                 val centerY = bounds.centerY().toFloat()
                 
-                val size = dpToPx(5).toFloat()
+                val size = dpToPx(8).toFloat()
                 val path = Path()
                 
                 path.moveTo(centerX - size, centerY - size * 0.4f)

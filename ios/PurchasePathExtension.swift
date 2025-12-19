@@ -192,6 +192,14 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     
     // PiP functionality moved to PictureInPictureManager
     
+    func hidePip() {
+        pipManager?.hidePip()
+    }
+    
+    func showPip() {
+        pipManager?.showPip()
+    }
+    
     func browser(_ browser: BrowserInterface, didNavigateTo page: BrowserPage) {
 #if DEBUG
         print("expo-button-sdk didNavigateTo - URL loaded, will hide loader with 2s delay")

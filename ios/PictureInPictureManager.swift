@@ -18,6 +18,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var earnTextBackgroundColor: UIColor = UIColor.black.withAlphaComponent(0.6)
     private var earnLabel: UILabel?
     private var chevronUpView: UIView?
+    private var coverImageScaleType: UIView.ContentMode = .scaleAspectFill
     
     private var isDragging: Bool = false
     private var dragStartLocation: CGPoint = .zero
@@ -45,6 +46,38 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                 self.earnTextBackgroundColor = UIColor(hex: bgColorString) ?? UIColor.black.withAlphaComponent(0.6)
             }
         }
+        
+        if let coverImage = options["coverImage"] as? [String: Any],
+           let scaleTypeString = coverImage["scaleType"] as? String {
+            switch scaleTypeString.lowercased() {
+            case "contain":
+                self.coverImageScaleType = .scaleAspectFit
+            case "cover":
+                self.coverImageScaleType = .scaleAspectFill
+            case "center":
+                self.coverImageScaleType = .center
+            case "stretch":
+                self.coverImageScaleType = .scaleToFill
+            default:
+                self.coverImageScaleType = .scaleAspectFill
+            }
+        }
+    }
+    
+    func hidePip() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.isMinimized, let pipWindow = self.pipWindow else { return }
+            pipWindow.frame.origin = CGPoint(x: -pipWindow.frame.width, y: pipWindow.frame.origin.y)
+        }
+    }
+    
+    func showPip() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.isMinimized, let pipWindow = self.pipWindow else { return }
+            let screenBounds = UIScreen.main.bounds
+            let targetX = self.lastPipPosition?.x ?? (screenBounds.width - pipWindow.frame.width - 16)
+            pipWindow.frame.origin = CGPoint(x: targetX, y: pipWindow.frame.origin.y)
+        }
     }
     
     func addMinimizeButton(to browser: BrowserInterface) {
@@ -63,10 +96,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         minimizeButton.translatesAutoresizingMaskIntoConstraints = false
         minimizeButton.addTarget(self, action: #selector(minimizeButtonTapped), for: .touchUpInside)
         
-        let chevronSize: CGFloat = 12
+        let chevronSize: CGFloat = 14.5
         let chevronView = UIView(frame: CGRect(x: 0, y: 0, width: chevronSize, height: chevronSize * 0.5))
         chevronView.backgroundColor = .clear
         chevronView.translatesAutoresizingMaskIntoConstraints = false
+        chevronView.isUserInteractionEnabled = false
         
         let chevronLayer = CAShapeLayer()
         let chevronPath = UIBezierPath()
@@ -76,7 +110,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         chevronLayer.path = chevronPath.cgPath
         chevronLayer.strokeColor = self.chevronColor.cgColor
         chevronLayer.fillColor = UIColor.clear.cgColor
-        chevronLayer.lineWidth = 2.5
+        chevronLayer.lineWidth = 3.0
         chevronLayer.lineCap = .round
         chevronLayer.lineJoin = .round
         chevronView.layer.addSublayer(chevronLayer)
@@ -86,7 +120,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             chevronView.centerXAnchor.constraint(equalTo: minimizeButton.centerXAnchor),
             chevronView.centerYAnchor.constraint(equalTo: minimizeButton.centerYAnchor),
             chevronView.widthAnchor.constraint(equalToConstant: chevronSize),
-            chevronView.heightAnchor.constraint(equalToConstant: chevronSize * 0.5)
+            chevronView.heightAnchor.constraint(equalToConstant: chevronSize * 0.6)
         ])
         
         // Get existing custom action view (deals button) if any
@@ -101,7 +135,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         
         // Set up constraints for horizontal layout
         NSLayoutConstraint.activate([
-            containerView.heightAnchor.constraint(equalToConstant: 30)
+            containerView.heightAnchor.constraint(equalToConstant: 44)
         ])
         
         if let existingView = existingView {
@@ -112,22 +146,22 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                 minimizeButton.leadingAnchor.constraint(equalTo: existingView.trailingAnchor, constant: 12),
                 minimizeButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
                 minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-                minimizeButton.heightAnchor.constraint(equalToConstant: 30)
+                minimizeButton.heightAnchor.constraint(equalToConstant: 44)
             ])
             
-            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 30)
+            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 44)
             widthConstraint.priority = .defaultHigh
             widthConstraint.isActive = true
             
-            containerView.widthAnchor.constraint(equalTo: existingView.widthAnchor, constant: 42).isActive = true
+            containerView.widthAnchor.constraint(equalTo: existingView.widthAnchor, constant: 56).isActive = true
         } else {
             NSLayoutConstraint.activate([
                 minimizeButton.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
                 minimizeButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-                minimizeButton.heightAnchor.constraint(equalToConstant: 30)
+                minimizeButton.heightAnchor.constraint(equalToConstant: 44)
             ])
             
-            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 30)
+            let widthConstraint = minimizeButton.widthAnchor.constraint(equalToConstant: 44)
             widthConstraint.priority = .defaultHigh
             widthConstraint.isActive = true
             
@@ -541,7 +575,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private func setupCoverImage(in containerView: UIView, size: CGSize, config: [String: Any]) {
         let imageView = UIImageView()
         imageView.frame = CGRect(origin: .zero, size: size)
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = self.coverImageScaleType
         imageView.clipsToBounds = true
         imageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
         
@@ -570,13 +604,13 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     
     private func setupPipOverlays(in containerView: UIView, size: CGSize) {
         let chevronUp = UIView()
-        chevronUp.frame = CGRect(x: size.width - 42, y: 14, width: 20, height: 12)
+        chevronUp.frame = CGRect(x: size.width - 35, y: 14, width: 15, height: 8)
         chevronUp.backgroundColor = .clear
         let chevronUpLayer = CAShapeLayer()
         let chevronUpPath = UIBezierPath()
-        chevronUpPath.move(to: CGPoint(x: 2, y: 10))
-        chevronUpPath.addLine(to: CGPoint(x: 10, y: 2))
-        chevronUpPath.addLine(to: CGPoint(x: 18, y: 10))
+        chevronUpPath.move(to: CGPoint(x: 0, y: 6))
+        chevronUpPath.addLine(to: CGPoint(x: 7.5, y: 0))
+        chevronUpPath.addLine(to: CGPoint(x: 15, y: 6))
         chevronUpLayer.path = chevronUpPath.cgPath
         chevronUpLayer.strokeColor = self.chevronColor.cgColor
         chevronUpLayer.fillColor = UIColor.clear.cgColor
