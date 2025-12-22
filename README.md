@@ -122,7 +122,10 @@ startPurchasePath({
       // Earn label overlay on minimized PiP (iOS & Android)
       earnText: "Earn 2%",
       earnTextColor: "#FFFFFF",
-      earnTextBackgroundColor: "#99000000"
+      earnTextBackgroundColor: "#99000000",
+      
+      // Android only: Aspect ratio for native PiP window
+      androidAspectRatio: { width: 3, height: 2 }
     }
   },
   
@@ -157,6 +160,7 @@ startPurchasePath({
 | `earnText` | iOS & Android | Text displayed on minimized PiP overlay |
 | `earnTextColor` | iOS & Android | Color of earn text |
 | `earnTextBackgroundColor` | iOS & Android | Background color of earn text label |
+| `androidAspectRatio` | Android only | Aspect ratio for native PiP `{ width, height }` (e.g., `{ width: 3, height: 2 }`) |
 
 #### Cover Image Options
 
