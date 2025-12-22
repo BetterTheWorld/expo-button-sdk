@@ -37,6 +37,8 @@ class PictureInPictureManager(
     private var coverImageScaleType: ImageView.ScaleType = ImageView.ScaleType.CENTER_CROP
     private var coverImageBackgroundColor: Int = Color.TRANSPARENT
     private var coverImagePadding: Int = 0
+    private var pipAspectRatioWidth: Int = 16
+    private var pipAspectRatioHeight: Int = 9
     private var pipOverlayView: View? = null
     private var currentPipActivity: WeakReference<Activity>? = null
     private var pipModeChecker: Runnable? = null
@@ -70,6 +72,10 @@ class PictureInPictureManager(
                 } catch (e: Exception) {
                     Log.w("PictureInPictureManager", "Invalid earnTextBackgroundColor: $colorString")
                 }
+            }
+            (config["androidAspectRatio"] as? Map<String, Any>)?.let { ratio ->
+                pipAspectRatioWidth = (ratio["width"] as? Number)?.toInt() ?: 16
+                pipAspectRatioHeight = (ratio["height"] as? Number)?.toInt() ?: 9
             }
         }
         
@@ -143,7 +149,7 @@ class PictureInPictureManager(
                         currentPipActivity?.get()?.let { activity ->
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                                 val pipParams = android.app.PictureInPictureParams.Builder()
-                                    .setAspectRatio(android.util.Rational(16, 9))
+                                    .setAspectRatio(android.util.Rational(pipAspectRatioWidth, pipAspectRatioHeight))
                                     .build()
                                 activity.enterPictureInPictureMode(pipParams)
                                 Log.d("PictureInPictureManager", "Re-entered PiP mode")
@@ -404,7 +410,7 @@ class PictureInPictureManager(
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             try {
                 val pipParamsBuilder = android.app.PictureInPictureParams.Builder()
-                val aspectRatio = android.util.Rational(16, 9)
+                val aspectRatio = android.util.Rational(pipAspectRatioWidth, pipAspectRatioHeight)
                 pipParamsBuilder.setAspectRatio(aspectRatio)
                 val pipParams = pipParamsBuilder.build()
                 

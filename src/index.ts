@@ -7,6 +7,7 @@ export type {
   HeaderButton,
   PictureInPicturePosition,
   PictureInPictureSize,
+  AndroidAspectRatio,
   PictureInPictureConfig,
   AnimationConfig,
   CoverImageConfig,

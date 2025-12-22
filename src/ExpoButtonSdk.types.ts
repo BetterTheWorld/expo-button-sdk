@@ -37,6 +37,11 @@ export interface PictureInPictureSize {
   height: number;
 }
 
+export interface AndroidAspectRatio {
+  width: number;
+  height: number;
+}
+
 export interface PictureInPictureConfig {
   enabled: boolean;
   position?: PictureInPicturePosition;
@@ -45,6 +50,7 @@ export interface PictureInPictureConfig {
   earnText?: string;
   earnTextColor?: string;
   earnTextBackgroundColor?: string;
+  androidAspectRatio?: AndroidAspectRatio;
 }
 
 export interface AnimationConfig {

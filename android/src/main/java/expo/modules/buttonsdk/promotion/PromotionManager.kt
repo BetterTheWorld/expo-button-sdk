@@ -73,8 +73,8 @@ class PromotionManager(
             }
         }
         
-        // Add flexible spacer to push minimize button to the right
-        if (pipManager != null) {
+        // Add flexible spacer to push minimize button to the right (only if PiP is available)
+        if (pipManager != null && hasPipPermission(context)) {
             val spacer = android.view.View(context).apply {
                 layoutParams = android.widget.LinearLayout.LayoutParams(0, 1).apply {
                     weight = 1.0f // This will take all available space
@@ -83,15 +83,19 @@ class PromotionManager(
             headerContainer.addView(spacer)
         }
         
-        // Add minimize button if PiP manager is available (right side)
+        // Add minimize button if PiP manager is available AND device has PiP permission (right side)
         pipManager?.let { 
-            android.util.Log.d("PromotionManager", "Creating minimize button with PiP manager")
-            try {
-                val minimizeButton = it.createMinimizeButton(context, browser)
-                headerContainer.addView(minimizeButton)
-                android.util.Log.d("PromotionManager", "Minimize button added to container")
-            } catch (e: Exception) {
-                android.util.Log.e("PromotionManager", "Error creating minimize button", e)
+            if (hasPipPermission(context)) {
+                android.util.Log.d("PromotionManager", "Creating minimize button with PiP manager")
+                try {
+                    val minimizeButton = it.createMinimizeButton(context, browser)
+                    headerContainer.addView(minimizeButton)
+                    android.util.Log.d("PromotionManager", "Minimize button added to container")
+                } catch (e: Exception) {
+                    android.util.Log.e("PromotionManager", "Error creating minimize button", e)
+                }
+            } else {
+                android.util.Log.w("PromotionManager", "PiP permission not available - minimize button not added")
             }
         } ?: run {
             android.util.Log.w("PromotionManager", "No PiP manager available - minimize button not added")
@@ -369,6 +373,34 @@ class PromotionManager(
     private fun dpToPx(dp: Int): Int {
         val context = contextRef.get() ?: return dp
         return (dp * context.resources.displayMetrics.density).toInt()
+    }
+    
+    private fun hasPipPermission(context: Context): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
+            return false
+        }
+        
+        return try {
+            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+            val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                appOps.unsafeCheckOpNoThrow(
+                    android.app.AppOpsManager.OPSTR_PICTURE_IN_PICTURE,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                appOps.checkOpNoThrow(
+                    android.app.AppOpsManager.OPSTR_PICTURE_IN_PICTURE,
+                    android.os.Process.myUid(),
+                    context.packageName
+                )
+            }
+            mode == android.app.AppOpsManager.MODE_ALLOWED
+        } catch (e: Exception) {
+            android.util.Log.e("PromotionManager", "Error checking PiP permission", e)
+            false
+        }
     }
     
     fun cleanup() {
