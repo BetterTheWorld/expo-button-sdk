@@ -611,11 +611,6 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             }
         }
         
-        let overlayView = UIView()
-        overlayView.frame = imageView.bounds
-        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.05)
-        imageView.addSubview(overlayView)
-        
         backgroundView.addSubview(imageView)
         containerView.addSubview(backgroundView)
         self.coverImageView = backgroundView
