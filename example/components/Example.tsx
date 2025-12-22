@@ -10,6 +10,7 @@ import { MOCK_PROMOTION_DATA } from "../../src/constants/MockData";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Button,
   SafeAreaView,
   ScrollView,
@@ -197,6 +198,9 @@ export function Example() {
                   "You might miss out on exclusive offers and lose your progress.",
                 stayButtonLabel: "Stay",
                 leaveButtonLabel: "Leave",
+              },
+              onClose: () => {
+                Alert.alert("close");
               },
             });
           }}

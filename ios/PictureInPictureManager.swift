@@ -297,11 +297,12 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         pipWindow?.windowScene = windowScene
         pipWindow?.windowLevel = UIWindow.Level.statusBar + 1
         pipWindow?.backgroundColor = UIColor.clear
-        pipWindow?.layer.cornerRadius = 12
-        pipWindow?.clipsToBounds = true
+        pipWindow?.clipsToBounds = false
         
         // Create container view controller
         let pipVC = UIViewController()
+        pipVC.view.layer.cornerRadius = 12
+        pipVC.view.clipsToBounds = true
         pipWindow?.rootViewController = pipVC
         
         // Set snapshot to fill the PiP window completely
@@ -317,8 +318,8 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         // Add shadow and styling to PiP window
         pipWindow?.layer.shadowColor = UIColor.black.cgColor
         pipWindow?.layer.shadowOffset = CGSize(width: 0, height: 4)
-        pipWindow?.layer.shadowOpacity = 0.3
-        pipWindow?.layer.shadowRadius = 8
+        pipWindow?.layer.shadowOpacity = 0.4
+        pipWindow?.layer.shadowRadius = 12
         
         // Add gestures for interaction
         setupPiPGestures(for: pipVC.view)

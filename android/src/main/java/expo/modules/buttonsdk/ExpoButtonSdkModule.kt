@@ -25,7 +25,7 @@ class ExpoButtonSdkModule() : Module() {
   override fun definition() = ModuleDefinition {
     Name("ExpoButtonSdk")
 
-    Events("onPromotionClick")
+    Events("onPromotionClick", "onHeaderButtonClick", "onClose")
 
     AsyncFunction("initializeSDK") { promise: Promise ->
       promise.resolve(true)
@@ -100,7 +100,7 @@ class ExpoButtonSdkModule() : Module() {
           if (purchasePath != null) {
             val activity = appContext.activityProvider?.currentActivity
             if (activity != null) {
-              Button.purchasePath().extension = CustomPurchasePathExtension(activity, params) { promotionId ->
+              Button.purchasePath().extension = CustomPurchasePathExtension(activity, params, { promotionId ->
                 try {
                   val eventBody = Bundle().apply {
                     putString("promotionId", promotionId)
@@ -109,7 +109,13 @@ class ExpoButtonSdkModule() : Module() {
                 } catch (e: Exception) {
                   Log.e("ButtonSdk", "Error sending promotion click event", e)
                 }
-              }
+              }, {
+                try {
+                  sendEvent("onClose", Bundle())
+                } catch (e: Exception) {
+                  Log.e("ButtonSdk", "Error sending close event", e)
+                }
+              })
               purchasePath.start(activity)
             } else {
               promise.reject("ERROR", "No context for purchasePath", throwable)
@@ -127,7 +133,8 @@ class ExpoButtonSdkModule() : Module() {
   class CustomPurchasePathExtension(
     activity: Activity,
     private val options: Map<String, Any>,
-    private val onPromotionClick: (String) -> Unit
+    private val onPromotionClick: (String) -> Unit,
+    private val onClose: () -> Unit
   ) : PurchasePathExtension {
 
     // Use WeakReference to prevent memory leaks
@@ -360,6 +367,7 @@ class ExpoButtonSdkModule() : Module() {
         pictureInPictureManager?.cleanup()
         pictureInPictureManager = null
         GlobalLoaderManager.getInstance().hideLoader()
+        onClose()
       } catch (e: Exception) {
         Log.e("CustomPurchasePathExtension", "Error during cleanup", e)
       }

@@ -82,6 +82,7 @@ export interface StartPurchasePathOptions {
     promotionId: string
   ) => Promise<{ url: string; token: string }>;
   onHeaderButtonClick?: (action: string) => void;
+  onClose?: () => void;
   closeOnPromotionClick?: boolean;
   promotionBadgeLabel?: string;
   promotionListTitle?: string;

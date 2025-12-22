@@ -72,9 +72,14 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     }
     
     private var cleanupCompletion: (() -> Void)?
+    private var closeCallback: (() -> Void)?
     
     func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         promotionManager?.setOnPromotionClickCallback(callback)
+    }
+    
+    func setCloseCallback(_ callback: @escaping () -> Void) {
+        self.closeCallback = callback
     }
     
     func cleanup(completion: (() -> Void)? = nil) {
@@ -244,6 +249,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         currentBrowser = nil
         
         print("🔄 Browser closed - loader management delegated to navigation methods")
+        
+        // Notify close callback
+        closeCallback?()
         
         // Execute pending completion block if any (e.g. from cleanup() call)
         // We add a small delay to ensure the UI hierarchy is fully stable for a new presentation

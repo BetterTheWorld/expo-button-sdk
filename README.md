@@ -128,11 +128,20 @@ startPurchasePath({
   
   // Optional: Cover image for the minimized PiP window (iOS & Android)
   coverImage: {
-    uri: "https://example.com/logo.png"
+    uri: "https://example.com/logo.png",
     // OR
     // source: "local_asset_name" (iOS only)
     // OR
     // base64: "..." (iOS only)
+    
+    scaleType: "cover", // "cover" | "contain" | "center" | "stretch"
+    backgroundColor: "#FFFFFF", // Background color visible with padding or transparent images
+    padding: 8 // Subtle padding around the image (points on iOS, dp on Android)
+  },
+  
+  // Optional: Callback when browser is closed
+  onClose: () => {
+    console.log('Browser closed');
   }
 });
 ```
@@ -148,6 +157,17 @@ startPurchasePath({
 | `earnText` | iOS & Android | Text displayed on minimized PiP overlay |
 | `earnTextColor` | iOS & Android | Color of earn text |
 | `earnTextBackgroundColor` | iOS & Android | Background color of earn text label |
+
+#### Cover Image Options
+
+| Option | Platform | Description |
+|--------|----------|-------------|
+| `uri` | iOS & Android | Remote image URL |
+| `source` | iOS only | Local asset name |
+| `base64` | iOS only | Base64 encoded image |
+| `scaleType` | iOS & Android | Image scaling: `cover`, `contain`, `center`, `stretch` |
+| `backgroundColor` | iOS & Android | Background color (visible with padding or transparent images) |
+| `padding` | iOS & Android | Padding around the image in points/dp |
 
 #### Platform Differences
 
@@ -179,6 +199,21 @@ showPip();
 - These functions only work when PiP mode is active (`isMinimized = true`)
 - On Android, `showPip()` briefly shows the activity in fullscreen before re-entering PiP mode
 - Starting a new purchase path while PiP is hidden will automatically clean up the hidden PiP state
+
+### onClose Callback
+
+Get notified when the browser is closed:
+
+```typescript
+startPurchasePath({
+  url: "https://the.button.url",
+  token: "my-tracking-token",
+  onClose: () => {
+    console.log('Browser was closed');
+    // Perform cleanup, analytics, or navigation
+  }
+});
+```
 
 ### Exit Confirmation Dialog
 

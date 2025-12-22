@@ -26,7 +26,7 @@ public class ExpoButtonSdkModule: Module {
     public func definition() -> ModuleDefinition {
         Name("ExpoButtonSdk")
         
-        Events("onPromotionClick", "onHeaderButtonClick")
+        Events("onPromotionClick", "onHeaderButtonClick", "onClose")
         
         Function("minimizeBrowser") {
             // No longer needed - handled by native button
@@ -99,6 +99,11 @@ public class ExpoButtonSdkModule: Module {
                     
                     // Store reference for potential cleanup
                     self.currentPurchasePathExtension = purchasePathExtension
+                    
+                    // Set up close callback
+                    purchasePathExtension.setCloseCallback { [weak self] in
+                        self?.sendEvent("onClose", [:])
+                    }
                     
                     // Set up promotion click callback with immediate browser dismiss
                     purchasePathExtension.setPromotionClickCallback { [weak self] promotionId, browser in

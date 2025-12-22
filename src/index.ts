@@ -20,6 +20,7 @@ import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 // Store the current listener to avoid accumulation
 let currentPromotionListener: any = null;
 let currentHeaderButtonListener: any = null;
+let currentCloseListener: any = null;
 
 export async function startPurchasePath(options: StartPurchasePathOptions) {
   // Validate PictureInPicture config first
@@ -38,6 +39,10 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
   if (currentHeaderButtonListener) {
     currentHeaderButtonListener.remove();
     currentHeaderButtonListener = null;
+  }
+  if (currentCloseListener) {
+    currentCloseListener.remove();
+    currentCloseListener = null;
   }
 
   // don't send promotionData if empty
@@ -93,8 +98,22 @@ export async function startPurchasePath(options: StartPurchasePathOptions) {
     );
   }
 
+  // Set up close listener if callback is provided
+  if (options.onClose) {
+    currentCloseListener = ExpoButtonSdkModule.addListener(
+      "onClose",
+      () => {
+        try {
+          options.onClose!();
+        } catch (error) {
+          console.error("Error handling close:", error);
+        }
+      }
+    );
+  }
+
   // Remove non-serializable properties before passing to native module
-  const { onPromotionClick, onHeaderButtonClick, ...tempOptions } = sanitizedOptions;
+  const { onPromotionClick, onHeaderButtonClick, onClose, ...tempOptions } = sanitizedOptions;
 
   // Deep clean undefined values that can't be serialized
   const cleanOptions = (obj: any): any => {
