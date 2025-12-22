@@ -1,4 +1,20 @@
 import { Identifier, StartPurchasePathOptions, validatePictureInPictureConfig } from "./ExpoButtonSdk.types";
+
+export type {
+  ExitConfirmationConfig,
+  Promotion,
+  PromotionData,
+  HeaderButton,
+  PictureInPicturePosition,
+  PictureInPictureSize,
+  PictureInPictureConfig,
+  AnimationConfig,
+  CoverImageConfig,
+  StartPurchasePathOptions,
+  Identifier,
+  ButtonSDKStatus,
+  PictureInPictureValidationResult,
+} from "./ExpoButtonSdk.types";
 import ExpoButtonSdkModule from "./ExpoButtonSdkModule";
 
 // Store the current listener to avoid accumulation

@@ -59,6 +59,8 @@ export interface CoverImageConfig {
   source?: string;
   base64?: string;
   scaleType?: 'cover' | 'contain' | 'center' | 'stretch';
+  backgroundColor?: string;
+  padding?: number;
 }
 
 export interface StartPurchasePathOptions {

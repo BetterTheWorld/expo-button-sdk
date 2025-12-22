@@ -7,7 +7,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var isMinimized: Bool = false
     private var originalBrowserViewController: UIViewController?
     private var options: [String: Any]
-    private var coverImageView: UIImageView?
+    private var coverImageView: UIView?
     private var pipWindow: UIWindow?
     private var originalWebView: UIView?
     private var containerView: UIView?
@@ -19,6 +19,8 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var earnLabel: UILabel?
     private var chevronUpView: UIView?
     private var coverImageScaleType: UIView.ContentMode = .scaleAspectFill
+    private var coverImageBackgroundColor: UIColor = .clear
+    private var coverImagePadding: CGFloat = 0
     
     private var isDragging: Bool = false
     private var dragStartLocation: CGPoint = .zero
@@ -47,19 +49,26 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             }
         }
         
-        if let coverImage = options["coverImage"] as? [String: Any],
-           let scaleTypeString = coverImage["scaleType"] as? String {
-            switch scaleTypeString.lowercased() {
-            case "contain":
-                self.coverImageScaleType = .scaleAspectFit
-            case "cover":
-                self.coverImageScaleType = .scaleAspectFill
-            case "center":
-                self.coverImageScaleType = .center
-            case "stretch":
-                self.coverImageScaleType = .scaleToFill
-            default:
-                self.coverImageScaleType = .scaleAspectFill
+        if let coverImage = options["coverImage"] as? [String: Any] {
+            if let scaleTypeString = coverImage["scaleType"] as? String {
+                switch scaleTypeString.lowercased() {
+                case "contain":
+                    self.coverImageScaleType = .scaleAspectFit
+                case "cover":
+                    self.coverImageScaleType = .scaleAspectFill
+                case "center":
+                    self.coverImageScaleType = .center
+                case "stretch":
+                    self.coverImageScaleType = .scaleToFill
+                default:
+                    self.coverImageScaleType = .scaleAspectFill
+                }
+            }
+            if let bgColorString = coverImage["backgroundColor"] as? String {
+                self.coverImageBackgroundColor = UIColor(hex: bgColorString) ?? .clear
+            }
+            if let padding = coverImage["padding"] as? NSNumber {
+                self.coverImagePadding = CGFloat(padding.doubleValue)
             }
         }
     }
@@ -535,7 +544,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     
     private func snapToEdges(currentFrame: CGRect) -> CGRect {
         let screenBounds = UIScreen.main.bounds
-        let snapMargin: CGFloat = 20
+        let snapMargin: CGFloat = 10
         
         var newFrame = currentFrame
         
@@ -553,8 +562,8 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         
         // Keep Y position but ensure it's within safe bounds
         let safeAreaInsets = getSafeAreaInsets()
-        let topMargin = safeAreaInsets.top + 20
-        let bottomMargin = safeAreaInsets.bottom + 20
+        let topMargin = safeAreaInsets.top + 8
+        let bottomMargin = safeAreaInsets.bottom + 8
         
         let minY = topMargin
         let maxY = screenBounds.height - currentFrame.height - bottomMargin
@@ -573,11 +582,20 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     }
     
     private func setupCoverImage(in containerView: UIView, size: CGSize, config: [String: Any]) {
+        let backgroundView = UIView()
+        backgroundView.frame = CGRect(origin: .zero, size: size)
+        backgroundView.backgroundColor = self.coverImageBackgroundColor
+        
         let imageView = UIImageView()
-        imageView.frame = CGRect(origin: .zero, size: size)
+        let padding = self.coverImagePadding
+        imageView.frame = CGRect(
+            x: padding,
+            y: padding,
+            width: size.width - (padding * 2),
+            height: size.height - (padding * 2)
+        )
         imageView.contentMode = self.coverImageScaleType
         imageView.clipsToBounds = true
-        imageView.backgroundColor = UIColor.black.withAlphaComponent(0.1)
         
         if let imageUrlString = config["uri"] as? String,
            let imageUrl = URL(string: imageUrlString) {
@@ -598,8 +616,9 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.05)
         imageView.addSubview(overlayView)
         
-        containerView.addSubview(imageView)
-        self.coverImageView = imageView
+        backgroundView.addSubview(imageView)
+        containerView.addSubview(backgroundView)
+        self.coverImageView = backgroundView
     }
     
     private func setupPipOverlays(in containerView: UIView, size: CGSize) {

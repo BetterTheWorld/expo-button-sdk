@@ -35,6 +35,8 @@ class PictureInPictureManager(
     private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
     private var coverImageUri: String? = null
     private var coverImageScaleType: ImageView.ScaleType = ImageView.ScaleType.CENTER_CROP
+    private var coverImageBackgroundColor: Int = Color.TRANSPARENT
+    private var coverImagePadding: Int = 0
     private var pipOverlayView: View? = null
     private var currentPipActivity: WeakReference<Activity>? = null
     private var pipModeChecker: Runnable? = null
@@ -81,6 +83,16 @@ class PictureInPictureManager(
                 "stretch" -> ImageView.ScaleType.FIT_XY
                 else -> ImageView.ScaleType.CENTER_CROP
             }
+        }
+        (coverImage?.get("backgroundColor") as? String)?.let { colorString ->
+            try {
+                coverImageBackgroundColor = Color.parseColor(colorString)
+            } catch (e: Exception) {
+                Log.w("PictureInPictureManager", "Invalid backgroundColor: $colorString")
+            }
+        }
+        (coverImage?.get("padding") as? Number)?.let { padding ->
+            coverImagePadding = dpToPx(padding.toInt())
         }
     }
     
@@ -431,7 +443,7 @@ class PictureInPictureManager(
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                         android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                     )
-                    setBackgroundColor(Color.TRANSPARENT)
+                    setBackgroundColor(coverImageBackgroundColor)
                     isClickable = false
                     isFocusable = false
                 }
@@ -441,7 +453,9 @@ class PictureInPictureManager(
                         layoutParams = android.widget.FrameLayout.LayoutParams(
                             android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                             android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-                        )
+                        ).apply {
+                            setMargins(coverImagePadding, coverImagePadding, coverImagePadding, coverImagePadding)
+                        }
                         scaleType = coverImageScaleType
                     }
                     loadImageFromUrl(coverImageUri!!, imageView)

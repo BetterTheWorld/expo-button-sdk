@@ -187,9 +187,8 @@ export function Example() {
               coverImage: {
                 uri: "https://placecats.com/millie_neo/300/200",
                 scaleType: "stretch",
-                // Alternative options:
-                // source: "my-local-image"  // from app bundle
-                // base64: "iVBORw0KGgoAAAANSUhEUgA..." // base64 string
+                backgroundColor: "#1a1a2e",
+                padding: 8,
               },
               exitConfirmation: {
                 enabled: true,
@@ -301,7 +300,8 @@ export function Example() {
               },
               coverImage: {
                 uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
-                scaleType: "cover",
+                scaleType: "center",
+                backgroundColor: "white",
               },
             });
           }}
