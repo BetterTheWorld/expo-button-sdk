@@ -51,6 +51,13 @@ export interface PictureInPictureConfig {
   earnTextColor?: string;
   earnTextBackgroundColor?: string;
   androidAspectRatio?: AndroidAspectRatio;
+  /**
+   * Android only: When true, PiP will hide when app goes to background
+   * and restore when app comes back to foreground.
+   * @platform android
+   * @default false
+   */
+  hideOnAppBackground?: boolean;
 }
 
 export interface AnimationConfig {

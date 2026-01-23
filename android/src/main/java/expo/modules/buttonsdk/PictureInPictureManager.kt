@@ -1,9 +1,11 @@
 package expo.modules.buttonsdk
 
 import android.app.Activity
+import android.app.Application
 import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.Drawable
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -43,10 +45,12 @@ class PictureInPictureManager(
     private var currentPipActivity: WeakReference<Activity>? = null
     private var pipModeChecker: Runnable? = null
     private val pipModeHandler = Handler(Looper.getMainLooper())
-    private var isPipHidden = false
     private var pipTaskId: Int = -1
+    private var isPipHidden = false
+    private var mainActivityLifecycleCallback: Application.ActivityLifecycleCallbacks? = null
+    private var hideOnAppBackground = false
     private var isRestoringPip = false
-    
+
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
         val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
@@ -77,8 +81,10 @@ class PictureInPictureManager(
                 pipAspectRatioWidth = (ratio["width"] as? Number)?.toInt() ?: 16
                 pipAspectRatioHeight = (ratio["height"] as? Number)?.toInt() ?: 9
             }
+            hideOnAppBackground = config["hideOnAppBackground"] as? Boolean ?: false
+            Log.d("PictureInPictureManager", "hideOnAppBackground: $hideOnAppBackground")
         }
-        
+
         val coverImage = options["coverImage"] as? Map<String, Any>
         coverImageUri = coverImage?.get("uri") as? String
         (coverImage?.get("scaleType") as? String)?.let { scaleTypeString ->
@@ -113,94 +119,205 @@ class PictureInPictureManager(
         return isMinimized
     }
     
-    fun hidePip() {
-        Handler(Looper.getMainLooper()).post {
-            if (!isMinimized || isPipHidden) return@post
-            
-            currentPipActivity?.get()?.let { activity ->
-                try {
-                    pipTaskId = activity.taskId
-                    activity.moveTaskToBack(true)
-                    isPipHidden = true
-                    Log.d("PictureInPictureManager", "PiP hidden, taskId: $pipTaskId")
-                } catch (e: Exception) {
-                    Log.e("PictureInPictureManager", "Error hiding PiP", e)
+    private fun setupMainActivityLifecycleCallback() {
+        if (!hideOnAppBackground) {
+            Log.d("PictureInPictureManager", "hideOnAppBackground is false, not setting up lifecycle callback")
+            return
+        }
+
+        removeMainActivityLifecycleCallback()
+
+        val application = (context as? Application) ?: (context.applicationContext as? Application)
+        if (application == null) {
+            Log.e("PictureInPictureManager", "Could not get Application for lifecycle callback")
+            return
+        }
+
+        mainActivityLifecycleCallback = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityStopped(activity: Activity) {
+                // Only react to MainActivity, not the PiP activity
+                if (activity.javaClass.simpleName == "MainActivity") {
+                    if (isRestoringPip) {
+                        Log.d("PictureInPictureManager", "MainActivity stopped - ignoring (restoring PiP)")
+                        return
+                    }
+                    Log.d("PictureInPictureManager", "MainActivity stopped - hiding PiP")
+                    hidePipInternal()
                 }
+            }
+
+            override fun onActivityStarted(activity: Activity) {
+                // Only react to MainActivity, not the PiP activity
+                if (activity.javaClass.simpleName == "MainActivity") {
+                    Log.d("PictureInPictureManager", "MainActivity started - showing PiP")
+                    showPipInternal()
+                }
+            }
+
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        }
+
+        application.registerActivityLifecycleCallbacks(mainActivityLifecycleCallback)
+        Log.d("PictureInPictureManager", "MainActivity lifecycle callback registered")
+    }
+
+    private fun removeMainActivityLifecycleCallback() {
+        mainActivityLifecycleCallback?.let { callback ->
+            val application = (context as? Application) ?: (context.applicationContext as? Application)
+            application?.unregisterActivityLifecycleCallbacks(callback)
+            mainActivityLifecycleCallback = null
+            Log.d("PictureInPictureManager", "MainActivity lifecycle callback removed")
+        }
+    }
+
+    private fun hidePipInternal() {
+        Handler(Looper.getMainLooper()).post {
+            val activity = currentPipActivity?.get()
+            if (activity == null || isPipHidden) {
+                return@post
+            }
+
+            try {
+                pipTaskId = activity.taskId
+                Log.d("PictureInPictureManager", "hidePipInternal() - moving task $pipTaskId to back")
+                activity.moveTaskToBack(true)
+                isPipHidden = true
+            } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error in hidePipInternal", e)
             }
         }
     }
-    
-    fun showPip() {
+
+    private fun showPipInternal() {
         Handler(Looper.getMainLooper()).post {
-            Log.d("PictureInPictureManager", "showPip called - isMinimized: $isMinimized, isPipHidden: $isPipHidden, taskId: $pipTaskId")
-            if (!isMinimized || !isPipHidden) return@post
-            
+            val activity = currentPipActivity?.get()
+            if (activity == null || pipTaskId == -1 || !isPipHidden) {
+                return@post
+            }
+
             try {
-                if (pipTaskId != -1) {
-                    isRestoringPip = true
-                    
-                    pipOverlayView?.alpha = 0f
-                    currentPipActivity?.get()?.window?.decorView?.alpha = 0f
-                    
-                    val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-                    activityManager.moveTaskToFront(pipTaskId, 0)
-                    
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        currentPipActivity?.get()?.let { activity ->
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                isRestoringPip = true
+                Log.d("PictureInPictureManager", "showPipInternal() - moving task $pipTaskId to front")
+                val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                activityManager.moveTaskToFront(pipTaskId, 0)
+                isPipHidden = false
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            if (!activity.isFinishing && !activity.isDestroyed) {
                                 val pipParams = android.app.PictureInPictureParams.Builder()
                                     .setAspectRatio(android.util.Rational(pipAspectRatioWidth, pipAspectRatioHeight))
                                     .build()
                                 activity.enterPictureInPictureMode(pipParams)
-                                Log.d("PictureInPictureManager", "Re-entered PiP mode")
-                                
-                                Handler(Looper.getMainLooper()).postDelayed({
-                                    activity.window?.decorView?.animate()?.alpha(1f)?.setDuration(150)?.start()
-                                    pipOverlayView?.animate()?.alpha(1f)?.setDuration(150)?.start()
-                                }, 50)
+                                Log.d("PictureInPictureManager", "showPipInternal() - entered PiP mode")
                             }
                         }
+                    } catch (e: Exception) {
+                        Log.e("PictureInPictureManager", "Error entering PiP in showPipInternal", e)
+                    } finally {
                         isRestoringPip = false
-                    }, 100)
-                    
-                    isPipHidden = false
-                    Log.d("PictureInPictureManager", "PiP shown via moveTaskToFront")
-                }
+                    }
+                }, 300)
             } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error in showPipInternal", e)
                 isRestoringPip = false
+            }
+        }
+    }
+
+    fun hidePip() {
+        Handler(Looper.getMainLooper()).post {
+            val activity = currentPipActivity?.get()
+            Log.d("PictureInPictureManager", "hidePip() called - activity: ${activity != null}, isPipHidden: $isPipHidden")
+
+            if (activity == null) {
+                Log.d("PictureInPictureManager", "hidePip() - no activity")
+                return@post
+            }
+
+            if (isPipHidden) {
+                Log.d("PictureInPictureManager", "hidePip() - already hidden, skipping")
+                return@post
+            }
+
+            try {
+                pipTaskId = activity.taskId
+                Log.d("PictureInPictureManager", "hidePip() - moving task $pipTaskId to back")
+                activity.moveTaskToBack(true)
+                isPipHidden = true
+                Log.d("PictureInPictureManager", "hidePip() - done")
+            } catch (e: Exception) {
+                Log.e("PictureInPictureManager", "Error hiding PiP", e)
+            }
+        }
+    }
+
+    fun showPip() {
+        Handler(Looper.getMainLooper()).post {
+            val activity = currentPipActivity?.get()
+            Log.d("PictureInPictureManager", "showPip() called - activity: ${activity != null}, pipTaskId: $pipTaskId, isPipHidden: $isPipHidden")
+
+            if (activity == null || pipTaskId == -1) {
+                Log.d("PictureInPictureManager", "showPip() - no activity or pipTaskId, skipping")
+                return@post
+            }
+
+            if (!isPipHidden) {
+                Log.d("PictureInPictureManager", "showPip() - not hidden, skipping")
+                return@post
+            }
+
+            try {
+                Log.d("PictureInPictureManager", "showPip() - moving task $pipTaskId to front")
+                val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                activityManager.moveTaskToFront(pipTaskId, 0)
+                isPipHidden = false
+
+                // Enter PiP after activity is ready
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                            if (!activity.isFinishing && !activity.isDestroyed) {
+                                val pipParams = android.app.PictureInPictureParams.Builder()
+                                    .setAspectRatio(android.util.Rational(pipAspectRatioWidth, pipAspectRatioHeight))
+                                    .build()
+                                activity.enterPictureInPictureMode(pipParams)
+                                Log.d("PictureInPictureManager", "showPip() - entered PiP mode")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("PictureInPictureManager", "Error entering PiP", e)
+                    }
+                }, 300)
+            } catch (e: Exception) {
                 Log.e("PictureInPictureManager", "Error showing PiP", e)
             }
         }
     }
     
     fun onPictureInPictureModeChanged(isInPipMode: Boolean) {
-        Log.d("PictureInPictureManager", "onPictureInPictureModeChanged: $isInPipMode")
-        if (!isInPipMode && isMinimized) {
+        Log.d("PictureInPictureManager", "onPictureInPictureModeChanged: $isInPipMode, isMinimized: $isMinimized, isPipHidden: $isPipHidden, isRestoringPip: $isRestoringPip")
+        if (!isInPipMode && isMinimized && !isRestoringPip) {
             hidePipOverlay()
+            removeMainActivityLifecycleCallback()
             isMinimized = false
+            isPipHidden = false
+            pipTaskId = -1
             delegate?.didRestore()
         }
     }
     
     fun closePipAndProceed(onComplete: () -> Unit) {
-        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback, isMinimized: $isMinimized, isPipHidden: $isPipHidden")
-        
-        if (!isMinimized && !isPipHidden) {
+        Log.d("PictureInPictureManager", "Closing PiP and proceeding with callback, isMinimized: $isMinimized")
+
+        if (!isMinimized) {
             Log.d("PictureInPictureManager", "PiP not active, proceeding immediately")
             onComplete()
-            return
-        }
-        
-        if (isPipHidden) {
-            Log.d("PictureInPictureManager", "PiP is hidden, cleaning up and proceeding")
-            Handler(Looper.getMainLooper()).post {
-                hidePipOverlay()
-                isMinimized = false
-                isPipHidden = false
-                isRestoringPip = false
-                pipTaskId = -1
-                onComplete()
-            }
             return
         }
         
@@ -415,11 +532,15 @@ class PictureInPictureManager(
                 val pipParams = pipParamsBuilder.build()
                 
                 val success = buttonActivity.enterPictureInPictureMode(pipParams)
-                
+
                 if (success) {
                     Log.d("PictureInPictureManager", "Successfully entered native PiP mode")
+                    currentPipActivity = WeakReference(buttonActivity)
+                    pipTaskId = buttonActivity.taskId
+                    Log.d("PictureInPictureManager", "Set pipTaskId to $pipTaskId")
                     showPipOverlay(buttonActivity)
                     startPipModeChecker(buttonActivity)
+                    setupMainActivityLifecycleCallback()
                 } else {
                     Log.w("PictureInPictureManager", "Failed to enter PiP mode")
                 }
@@ -513,7 +634,10 @@ class PictureInPictureManager(
                         if (!activity.isInPictureInPictureMode && isMinimized && !isPipHidden && !isRestoringPip) {
                             Log.d("PictureInPictureManager", "Detected exit from PiP mode")
                             hidePipOverlay()
+                            removeMainActivityLifecycleCallback()
                             isMinimized = false
+                            isPipHidden = false
+                            pipTaskId = -1
                             delegate?.didRestore()
                             stopPipModeChecker()
                             return
@@ -660,14 +784,18 @@ class PictureInPictureManager(
     
     fun cleanup() {
         BrowserScrollEventBus.getInstance().removeVisibilityObserver(this)
-        
+
         stopPipModeChecker()
         hidePipOverlay()
-        
+        removeMainActivityLifecycleCallback()
+
         originalBrowser = null
         containerView = null
         isMinimized = false
-        
+        isPipHidden = false
+        isRestoringPip = false
+        pipTaskId = -1
+
         Log.d("PictureInPictureManager", "Cleanup completed")
     }
 }

@@ -1,8 +1,6 @@
 import {
   startPurchasePath,
   initializeSDK,
-  hidePip,
-  showPip,
   type StartPurchasePathOptions,
 } from "@flipgive/expo-button-sdk";
 import React, { useEffect, useState, useCallback } from "react";
@@ -16,14 +14,12 @@ import {
   View,
 } from "react-native";
 import { DemoButton } from "./DemoButton";
-import { PipControls } from "./PipControls";
 import { ActionButtons } from "./ActionButtons";
 import { DEMO_CONFIGS, type DemoConfig } from "./demoConfigs";
 
 type DemoItem =
   | { type: "header" }
   | { type: "demo"; id: string; title: string; options: StartPurchasePathOptions }
-  | { type: "pip-controls" }
   | { type: "actions" };
 
 const TOKEN = process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE ?? "";
@@ -31,7 +27,6 @@ const TOKEN = process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE ?? "";
 export function Example() {
   const [isSDKInitialized, setIsSDKInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isPipHidden, setIsPipHidden] = useState(false);
 
   useEffect(() => {
     async function initialize() {
@@ -55,16 +50,6 @@ export function Example() {
     startPurchasePath(options);
   }, []);
 
-  const handlePipToggle = useCallback(() => {
-    if (isPipHidden) {
-      showPip();
-      setIsPipHidden(false);
-    } else {
-      hidePip();
-      setIsPipHidden(true);
-    }
-  }, [isPipHidden]);
-
   const data: DemoItem[] = [
     { type: "header" },
     ...DEMO_CONFIGS.map((config: DemoConfig) => ({
@@ -73,7 +58,6 @@ export function Example() {
       title: config.title,
       options: config.options,
     })),
-    { type: "pip-controls" },
     { type: "actions" },
   ];
 
@@ -89,17 +73,13 @@ export function Example() {
               onPress={() => handleDemoPress(item.options)}
             />
           );
-        case "pip-controls":
-          return (
-            <PipControls isPipHidden={isPipHidden} onToggle={handlePipToggle} />
-          );
         case "actions":
           return <ActionButtons />;
         default:
           return null;
       }
     },
-    [handleDemoPress, isPipHidden, handlePipToggle]
+    [handleDemoPress]
   );
 
   const keyExtractor = useCallback((item: DemoItem, index: number) => {

@@ -37,7 +37,7 @@ export const DEMO_CONFIGS: DemoConfig[] = [
   },
   {
     id: "pip-default",
-    title: "PiP Default",
+    title: "PiP Default (Hide on BG)",
     options: {
       url: "https://www.adidas.com/us",
       token: TOKEN,
@@ -52,6 +52,7 @@ export const DEMO_CONFIGS: DemoConfig[] = [
       animationConfig: {
         pictureInPicture: {
           enabled: true,
+          hideOnAppBackground: true,
         },
       },
       exitConfirmation: {
