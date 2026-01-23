@@ -1,6 +1,6 @@
 {
   "name": "@flipgive/expo-button-sdk",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Button sdk for expo",
   "main": "build/index.js",
   "types": "build/index.d.ts",
