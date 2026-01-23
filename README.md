@@ -107,25 +107,28 @@ Enable Picture-in-Picture mode to keep the browser visible while users navigate 
 startPurchasePath({
   url: "https://the.button.url",
   token: "my-tracking-token",
-  
+
   animationConfig: {
     pictureInPicture: {
       enabled: true,
-      
+
       // iOS Only: Custom initial position and size
       position: { x: 20, y: 100 },
       size: { width: 150, height: 200 },
-      
+
       // Chevron color (iOS & Android)
       chevronColor: "#FFFFFF",
-      
+
       // Earn label overlay on minimized PiP (iOS & Android)
       earnText: "Earn 2%",
       earnTextColor: "#FFFFFF",
       earnTextBackgroundColor: "#99000000",
-      
+
       // Android only: Aspect ratio for native PiP window
-      androidAspectRatio: { width: 3, height: 2 }
+      androidAspectRatio: { width: 3, height: 2 },
+
+      // Android only: Auto-hide PiP when app goes to background
+      hideOnAppBackground: true
     }
   },
   
@@ -161,6 +164,7 @@ startPurchasePath({
 | `earnTextColor` | iOS & Android | Color of earn text |
 | `earnTextBackgroundColor` | iOS & Android | Background color of earn text label |
 | `androidAspectRatio` | Android only | Aspect ratio for native PiP `{ width, height }` (e.g., `{ width: 3, height: 2 }`) |
+| `hideOnAppBackground` | Android only | When `true`, automatically hides PiP when the app goes to background and restores it when returning to foreground (default: `false`) |
 
 #### Cover Image Options
 
@@ -176,7 +180,7 @@ startPurchasePath({
 #### Platform Differences
 
 - **iOS**: Custom floating window with cover image, earn label, and chevron overlay. Tap anywhere to restore.
-- **Android**: Native system PiP with cover image and earn label overlay. Uses system controls to restore.
+- **Android**: Native system PiP with cover image and earn label overlay. Uses system controls to restore. With `hideOnAppBackground: true`, the PiP window automatically hides when the user leaves the app (e.g., pressing home) and reappears when returning.
 
 #### Programmatic PiP Control
 
