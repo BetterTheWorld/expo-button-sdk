@@ -58,6 +58,14 @@ export interface PictureInPictureConfig {
    * @default false
    */
   hideOnAppBackground?: boolean;
+  /**
+   * Android only: When true, uses native Android PiP API (enterPictureInPictureMode).
+   * When false, uses a simulated PiP with a draggable floating overlay within the app,
+   * similar to the iOS implementation.
+   * @platform android
+   * @default true
+   */
+  useNativePip?: boolean;
 }
 
 export interface AnimationConfig {

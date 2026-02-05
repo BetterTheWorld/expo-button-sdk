@@ -50,6 +50,8 @@ class PictureInPictureManager(
     private var mainActivityLifecycleCallback: Application.ActivityLifecycleCallbacks? = null
     private var hideOnAppBackground = false
     private var isRestoringPip = false
+    private var useNativePip = true
+    private var simulatedPipManager: SimulatedPipManager? = null
 
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
@@ -76,6 +78,11 @@ class PictureInPictureManager(
                 pipAspectRatioHeight = (ratio["height"] as? Number)?.toInt() ?: 9
             }
             hideOnAppBackground = config["hideOnAppBackground"] as? Boolean ?: false
+            useNativePip = config["useNativePip"] as? Boolean ?: true
+        }
+
+        if (!useNativePip) {
+            simulatedPipManager = SimulatedPipManager(context, options, ::onSimulatedPipRestored)
         }
 
         val coverImage = options["coverImage"] as? Map<String, Any>
@@ -104,6 +111,12 @@ class PictureInPictureManager(
     interface PictureInPictureManagerDelegate {
         fun didMinimize()
         fun didRestore()
+    }
+
+    private fun onSimulatedPipRestored() {
+        isMinimized = false
+        isPipHidden = false
+        delegate?.didRestore()
     }
 
     fun isPipActive(): Boolean {
@@ -199,6 +212,11 @@ class PictureInPictureManager(
     }
 
     fun hidePip() {
+        if (!useNativePip) {
+            simulatedPipManager?.hide()
+            return
+        }
+
         Handler(Looper.getMainLooper()).post {
             val activity = currentPipActivity?.get() ?: return@post
             if (isPipHidden) return@post
@@ -214,6 +232,11 @@ class PictureInPictureManager(
     }
 
     fun showPip() {
+        if (!useNativePip) {
+            simulatedPipManager?.show()
+            return
+        }
+
         Handler(Looper.getMainLooper()).post {
             val activity = currentPipActivity?.get()
             if (activity == null || pipTaskId == -1 || !isPipHidden) return@post
@@ -244,6 +267,8 @@ class PictureInPictureManager(
     }
 
     fun onPictureInPictureModeChanged(isInPipMode: Boolean) {
+        if (!useNativePip) return // Not applicable for simulated mode
+
         if (!isInPipMode && isMinimized && !isRestoringPip) {
             hidePipOverlay()
             removeMainActivityLifecycleCallback()
@@ -256,6 +281,15 @@ class PictureInPictureManager(
 
     fun closePipAndProceed(onComplete: () -> Unit) {
         if (!isMinimized) {
+            onComplete()
+            return
+        }
+
+        if (!useNativePip) {
+            isClosingForNewContent = true
+            simulatedPipManager?.closePipForNewContent()
+            isMinimized = false
+            isClosingForNewContent = false
             onComplete()
             return
         }
@@ -382,9 +416,9 @@ class PictureInPictureManager(
 
         while (currentView != null) {
             if (currentView is android.view.ViewGroup) {
-                val context = currentView.context
-                if (context is Activity && context.javaClass.name.contains("WebViewActivity")) {
-                    buttonSdkActivity = context
+                val ctx = currentView.context
+                if (ctx is Activity && ctx.javaClass.name.contains("WebViewActivity")) {
+                    buttonSdkActivity = ctx
                     break
                 }
             }
@@ -396,7 +430,18 @@ class PictureInPictureManager(
         isAnimating = true
 
         try {
-            tryNativeAndroidPiP(targetActivity)
+            if (useNativePip) {
+                tryNativeAndroidPiP(targetActivity)
+            } else {
+                val mainActivity = (context as? Activity)
+                if (mainActivity != null) {
+                    simulatedPipManager?.minimize(targetActivity, mainActivity)
+                } else {
+                    Log.e("PictureInPictureManager", "Main activity not available for simulated PiP")
+                    isAnimating = false
+                    return
+                }
+            }
             isAnimating = false
             isMinimized = true
             delegate?.didMinimize()
@@ -561,6 +606,11 @@ class PictureInPictureManager(
     private fun restoreFromPiP() {
         if (!isMinimized || isAnimating) return
 
+        if (!useNativePip) {
+            simulatedPipManager?.restore()
+            return
+        }
+
         hidePipOverlay()
         isAnimating = false
         isMinimized = false
@@ -636,6 +686,8 @@ class PictureInPictureManager(
         stopPipModeChecker()
         hidePipOverlay()
         removeMainActivityLifecycleCallback()
+        simulatedPipManager?.cleanup()
+        simulatedPipManager = null
         originalBrowser = null
         containerView = null
         isMinimized = false

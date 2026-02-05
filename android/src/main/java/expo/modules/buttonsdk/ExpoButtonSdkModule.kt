@@ -320,7 +320,7 @@ class ExpoButtonSdkModule() : Module() {
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
     override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
       Log.d("CustomPurchasePathExtension", "onShouldClose called, exitConfirmationEnabled: $exitConfirmationEnabled")
-      
+
       // Check if new purchase path is starting from React Native - ONLY skip modal for SYSTEM closure
       if (isNewPurchasePathStarting) {
         Log.d("CustomPurchasePathExtension", "NEW PURCHASE PATH STARTING - SYSTEM CLOSURE - SKIPPING EXIT MODAL")
@@ -334,13 +334,13 @@ class ExpoButtonSdkModule() : Module() {
         Log.d("CustomPurchasePathExtension", "PiP is closing for new content (SYSTEM), skipping exit confirmation")
         return true // Allow closure without confirmation
       }
-      
+
       // If PiP is just minimized but user is closing manually, SHOW the modal
       if (pipManager != null && pipManager.isPipActive()) {
         Log.d("CustomPurchasePathExtension", "PiP is active but USER is closing - SHOWING EXIT MODAL")
         // Let it fall through to show modal
       }
-      
+
       if (exitConfirmationEnabled) {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
