@@ -323,7 +323,17 @@ class SimulatedPipManager(
     }
 
     fun cleanup() {
-        removeBubble()
+        // Capture references before nulling fields so we can remove the view on the main thread
+        val view = bubbleView
+        val wm = windowManager
+        if (view != null && wm != null) {
+            Handler(Looper.getMainLooper()).post {
+                try { wm.removeViewImmediate(view) } catch (_: Exception) {}
+            }
+        }
+        bubbleView = null
+        bubbleLayoutParams = null
+        isBubbleAttached = false
         removeLifecycleCallbacks()
         isActive = false
         pendingBubbleShow = false
