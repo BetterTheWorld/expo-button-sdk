@@ -230,6 +230,102 @@ export const DEMO_CONFIGS: DemoConfig[] = [
     },
   },
   {
+    id: "pip-simulated",
+    title: "Simulated PiP (No Native)",
+    options: {
+      url: "https://www.adidas.com/us",
+      token: TOKEN,
+      footerBackgroundColor: "#6C63FF",
+      footerTintColor: "#FFFFFF",
+      headerBackgroundColor: "#6C63FF",
+      headerSubtitle: "Simulated PiP Test",
+      headerSubtitleColor: "#D4D1FF",
+      headerTintColor: "#FFFFFF",
+      headerTitle: "Simulated",
+      headerTitleColor: "#FFFFFF",
+      animationConfig: {
+        pictureInPicture: {
+          enabled: true,
+          useNativePip: false,
+          size: { width: 150, height: 150 },
+          chevronColor: "#FFFFFF",
+          earnText: "Earn 5%",
+          earnTextColor: "#FFFFFF",
+          earnTextBackgroundColor: "#6C63FF",
+        },
+      },
+      coverImage: {
+        uri: "https://placecats.com/millie_neo/300/200",
+        scaleType: "cover",
+        backgroundColor: "#1a1a2e",
+        padding: 8,
+      },
+      exitConfirmation: {
+        enabled: true,
+        title: "Are you sure you want to leave?",
+        message: "You might miss out on deals.",
+        stayButtonLabel: "Stay",
+        leaveButtonLabel: "Leave",
+      },
+      onClose: () => {
+        Alert.alert("Browser closed");
+      },
+    },
+  },
+  {
+    id: "pip-simulated-promos",
+    title: "Simulated PiP + Promotions",
+    options: {
+      url: "https://www.adidas.com/us",
+      token: TOKEN,
+      headerTitleColor: "#ffffff",
+      headerSubtitleColor: "#ffffff",
+      headerBackgroundColor: "#2D3436",
+      headerTintColor: "#ffffff",
+      footerTintColor: "#ffffff",
+      footerBackgroundColor: "#2D3436",
+      headerSubtitle: "Gives 10%",
+      headerTitle: "Sim PiP + Promos",
+      promotionBadgeFontSize: 14,
+      promotionBadgeLabel: "2 deals",
+      promotionListTitle: "Available Deals",
+      promotionData: MOCK_PROMOTION_DATA,
+      closeOnPromotionClick: true,
+      onPromotionClick: async (promotionId: string) => {
+        console.log("Promotion clicked:", promotionId);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return {
+          url: "https://example.com",
+          token: "new-token-for-promotion",
+        };
+      },
+      animationConfig: {
+        pictureInPicture: {
+          enabled: true,
+          useNativePip: false,
+          position: { x: 20, y: 200 },
+          size: { width: 180, height: 180 },
+          earnText: "Earn 10%",
+          earnTextColor: "#FFFFFF",
+          earnTextBackgroundColor: "#00B894",
+        },
+      },
+      coverImage: {
+        uri: "https://placecats.com/millie_neo/300/200",
+        scaleType: "cover",
+        backgroundColor: "#2D3436",
+        padding: 8,
+      },
+      exitConfirmation: {
+        enabled: true,
+        title: "Leaving so soon?",
+        message: "If you exit now, you might miss your cashback.",
+        stayButtonLabel: "Keep shopping",
+        leaveButtonLabel: "Leave anyway",
+      },
+    },
+  },
+  {
     id: "pip-nike",
     title: "PiP Nike (Custom Colors)",
     options: {
