@@ -18,30 +18,28 @@ import android.widget.TextView
 import java.lang.ref.WeakReference
 
 /**
- * Simulated PiP for Android: makes the browser activity translucent so the
- * RN app is visible behind it, hides browser content, makes the window
- * non-touchable (touches pass through to the app), and shows a floating
- * draggable bubble via WindowManager. Tap the bubble to restore.
+ * Persistent Simulated PiP: shows a floating draggable bubble on MainActivity.
+ * The browser is dismissed (SDK kills it), and the bubble allows re-opening.
+ * The bubble survives HOME press by re-attaching on activity resume.
  */
 class SimulatedPipManager(
     private val context: Context,
     private val options: Map<String, Any>,
-    private val onRestore: (() -> Unit)? = null
+    private val onReopen: (() -> Unit)? = null
 ) {
 
     companion object {
         private const val TAG = "SimulatedPipManager"
     }
 
-    private var isMinimized = false
+    private var isActive = false
     private var bubbleView: FrameLayout? = null
-    private var browserActivityRef: WeakReference<Activity>? = null
-    private var isPipHidden = false
-    private var hiddenViews: MutableList<Pair<View, Int>> = mutableListOf()
+    private var hostActivityRef: WeakReference<Activity>? = null
     private var windowManager: WindowManager? = null
     private var bubbleLayoutParams: WindowManager.LayoutParams? = null
     private var lifecycleCallbacks: Application.ActivityLifecycleCallbacks? = null
     private var isBubbleAttached = false
+    private var pendingBubbleShow = false
 
     // Configuration
     private var pipWidth: Int = 120
@@ -105,86 +103,68 @@ class SimulatedPipManager(
         (coverImage?.get("padding") as? Number)?.let { coverImagePadding = dpToPx(it.toInt()) }
     }
 
-    fun isActive(): Boolean = isMinimized
+    fun isActive(): Boolean = isActive
 
-    fun minimize(browserActivity: Activity, @Suppress("UNUSED_PARAMETER") mainActivity: Activity) {
-        if (isMinimized) return
-        browserActivityRef = WeakReference(browserActivity)
-
-        Handler(Looper.getMainLooper()).post {
-            val activity = browserActivityRef?.get()
-            if (activity == null || activity.isFinishing || activity.isDestroyed) return@post
-
-            try {
-                val contentFrame = activity.findViewById<ViewGroup>(android.R.id.content) ?: return@post
-
-                // 1. Make activity translucent FIRST so system renders RN activity behind
-                convertToTranslucent(activity)
-
-                // 2. Make ALL window backgrounds fully transparent
-                activity.window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-                activity.window.decorView.setBackgroundColor(Color.TRANSPARENT)
-                contentFrame.setBackgroundColor(Color.TRANSPARENT)
-
-                // 3. Hide browser content views
-                hiddenViews.clear()
-                for (i in 0 until contentFrame.childCount) {
-                    val child = contentFrame.getChildAt(i)
-                    hiddenViews.add(Pair(child, child.visibility))
-                    child.visibility = View.GONE
-                }
-
-                // 4. Make window not touchable - touches pass through to RN app behind
-                activity.window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
-
-                // 5. Add floating bubble via WindowManager (receives its own touches)
-                addBubble(activity)
-
-                // 6. Register lifecycle callbacks
-                registerLifecycleCallbacks(activity)
-
-                isMinimized = true
-                Log.d(TAG, "Minimized: translucent + transparent bg + not-touchable + bubble")
-            } catch (e: Exception) {
-                Log.e(TAG, "Error minimizing", e)
-            }
-        }
+    /**
+     * Enter persistent PiP mode: register lifecycle callbacks and show bubble
+     * when the host activity is next resumed (after the browser closes).
+     */
+    fun enterPersistentMode(hostActivity: Activity) {
+        if (isActive) return
+        hostActivityRef = WeakReference(hostActivity)
+        isActive = true
+        pendingBubbleShow = true
+        registerLifecycleCallbacks(hostActivity)
+        Log.d(TAG, "Entered persistent mode, waiting for activity resume to show bubble")
     }
 
     private fun addBubble(activity: Activity) {
         if (isBubbleAttached) return
 
-        val wm = activity.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        windowManager = wm
+        try {
+            val token = activity.window?.decorView?.windowToken
+            if (token == null) {
+                Log.w(TAG, "Window token is null, cannot add bubble")
+                return
+            }
 
-        val screenW = activity.resources.displayMetrics.widthPixels
-        val screenH = activity.resources.displayMetrics.heightPixels
-        val x = lastSavedX?.toInt() ?: if (pipX >= 0) pipX.toInt() else (screenW - pipWidth - dpToPx(16))
-        val y = lastSavedY?.toInt() ?: if (pipY >= 0) pipY.toInt() else (screenH - pipHeight - dpToPx(100))
+            val wm = activity.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            windowManager = wm
 
-        val bubble = createBubble(activity)
-        val params = WindowManager.LayoutParams(
-            pipWidth, pipHeight,
-            WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            this.x = x
-            this.y = y
-            token = activity.window.decorView.windowToken
+            val screenW = activity.resources.displayMetrics.widthPixels
+            val screenH = activity.resources.displayMetrics.heightPixels
+            val x = lastSavedX?.toInt() ?: if (pipX >= 0) pipX.toInt() else (screenW - pipWidth - dpToPx(16))
+            val y = lastSavedY?.toInt() ?: if (pipY >= 0) pipY.toInt() else (screenH - pipHeight - dpToPx(100))
+
+            val bubble = createBubble(activity)
+            val params = WindowManager.LayoutParams(
+                pipWidth, pipHeight,
+                WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                this.x = x
+                this.y = y
+                this.token = token
+            }
+
+            wm.addView(bubble, params)
+            bubbleView = bubble
+            bubbleLayoutParams = params
+            isBubbleAttached = true
+
+            // Scale-in animation
+            bubble.scaleX = 0f
+            bubble.scaleY = 0f
+            bubble.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
+
+            Log.d(TAG, "Bubble shown on ${activity.javaClass.simpleName}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding bubble: ${e.message}", e)
+            isBubbleAttached = false
         }
-
-        wm.addView(bubble, params)
-        bubbleView = bubble
-        bubbleLayoutParams = params
-        isBubbleAttached = true
-
-        // Scale-in animation
-        bubble.scaleX = 0f
-        bubble.scaleY = 0f
-        bubble.animate().scaleX(1f).scaleY(1f).setDuration(200).start()
     }
 
     private fun removeBubble() {
@@ -279,7 +259,7 @@ class SimulatedPipManager(
                 }
                 MotionEvent.ACTION_UP -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
-                    if (!isDragging) restore() else snapToEdge(view)
+                    if (!isDragging) onBubbleTapped() else snapToEdge(view)
                     isDragging = false; true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -291,8 +271,29 @@ class SimulatedPipManager(
         }
     }
 
+    private fun onBubbleTapped() {
+        Log.d(TAG, "Bubble tapped - re-opening browser")
+        // Scale-out animation then reopen
+        val bubble = bubbleView
+        if (bubble != null && isBubbleAttached) {
+            bubble.animate().scaleX(0f).scaleY(0f).setDuration(150).withEndAction {
+                removeBubble()
+                removeLifecycleCallbacks()
+                isActive = false
+                pendingBubbleShow = false
+                onReopen?.invoke()
+            }.start()
+        } else {
+            removeBubble()
+            removeLifecycleCallbacks()
+            isActive = false
+            pendingBubbleShow = false
+            onReopen?.invoke()
+        }
+    }
+
     private fun snapToEdge(view: View) {
-        val activity = browserActivityRef?.get() ?: return
+        val activity = hostActivityRef?.get() ?: return
         val params = bubbleLayoutParams ?: return
         val sw = activity.resources.displayMetrics.widthPixels
         val sh = activity.resources.displayMetrics.heightPixels
@@ -305,68 +306,18 @@ class SimulatedPipManager(
         lastSavedX = tx.toFloat(); lastSavedY = ty.toFloat()
     }
 
-    fun restore() {
-        if (!isMinimized) return
-        isMinimized = false
-
-        Handler(Looper.getMainLooper()).post {
-            val activity = browserActivityRef?.get()
-            if (activity == null || activity.isFinishing || activity.isDestroyed) {
-                removeBubble()
-                removeLifecycleCallbacks()
-                isPipHidden = false
-                onRestore?.invoke()
-                return@post
-            }
-
-            // 1. Scale-out bubble then remove
-            val bubble = bubbleView
-            if (bubble != null && isBubbleAttached) {
-                bubble.animate().scaleX(0f).scaleY(0f).setDuration(150).withEndAction {
-                    removeBubble()
-                }.start()
-            } else {
-                removeBubble()
-            }
-
-            // 2. Undo window flags
-            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
-
-            // 3. Convert back from translucent and restore window background
-            convertFromTranslucent(activity)
-            activity.window.setBackgroundDrawableResource(android.R.color.white)
-
-            // 4. Restore content visibility
-            for ((view, vis) in hiddenViews) {
-                view.visibility = vis
-            }
-            hiddenViews.clear()
-
-            // 5. Remove lifecycle callbacks
-            removeLifecycleCallbacks()
-
-            isPipHidden = false
-            Log.d(TAG, "Restored")
-            onRestore?.invoke()
-        }
-    }
-
-    fun closePipForNewContent() { if (isMinimized) restore() }
-
     fun hide() {
         Handler(Looper.getMainLooper()).post {
-            if (!isMinimized || isPipHidden) return@post
+            if (!isActive) return@post
             removeBubble()
-            isPipHidden = true
         }
     }
 
     fun show() {
         Handler(Looper.getMainLooper()).post {
-            val activity = browserActivityRef?.get() ?: return@post
-            if (isMinimized && isPipHidden) {
+            val activity = hostActivityRef?.get() ?: return@post
+            if (isActive && !isBubbleAttached) {
                 addBubble(activity)
-                isPipHidden = false
             }
         }
     }
@@ -374,54 +325,13 @@ class SimulatedPipManager(
     fun cleanup() {
         removeBubble()
         removeLifecycleCallbacks()
-
-        val activity = browserActivityRef?.get()
-        if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
-            Handler(Looper.getMainLooper()).post {
-                try {
-                    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
-                    convertFromTranslucent(activity)
-                    for ((v, vis) in hiddenViews) { v.visibility = vis }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error during cleanup restore", e)
-                }
-            }
-        }
-        hiddenViews.clear()
-        isMinimized = false
-        isPipHidden = false
-        browserActivityRef = null
+        isActive = false
+        pendingBubbleShow = false
+        hostActivityRef = null
         lastSavedX = null
         lastSavedY = null
         windowManager = null
-    }
-
-    // --- Translucent conversion via hidden API ---
-
-    private fun convertToTranslucent(activity: Activity) {
-        try {
-            val method = Activity::class.java.getDeclaredMethod(
-                "convertToTranslucent",
-                Class.forName("android.app.Activity\$TranslucentConversionListener"),
-                android.app.ActivityOptions::class.java
-            )
-            method.isAccessible = true
-            method.invoke(activity, null, null)
-            Log.d(TAG, "convertToTranslucent success")
-        } catch (e: Exception) {
-            Log.e(TAG, "convertToTranslucent failed", e)
-        }
-    }
-
-    private fun convertFromTranslucent(activity: Activity) {
-        try {
-            val method = Activity::class.java.getDeclaredMethod("convertFromTranslucent")
-            method.isAccessible = true
-            method.invoke(activity)
-            Log.d(TAG, "convertFromTranslucent success")
-        } catch (e: Exception) {
-            Log.e(TAG, "convertFromTranslucent failed", e)
-        }
+        Log.d(TAG, "Cleaned up")
     }
 
     // --- Lifecycle callbacks ---
@@ -431,30 +341,31 @@ class SimulatedPipManager(
         val app = activity.application ?: return
 
         lifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
-            override fun onActivityPaused(a: Activity) {
-                // Remove bubble before background to prevent WindowLeaked
-                if (a === browserActivityRef?.get() && isMinimized && isBubbleAttached) {
-                    Log.d(TAG, "Browser paused - removing bubble to prevent leak")
-                    removeBubble()
+            override fun onActivityResumed(a: Activity) {
+                val isHost = a === hostActivityRef?.get()
+                Log.d(TAG, "onActivityResumed: ${a.javaClass.simpleName} isHost=$isHost isActive=$isActive isBubbleAttached=$isBubbleAttached pending=$pendingBubbleShow")
+                if (isHost && isActive) {
+                    if (pendingBubbleShow || !isBubbleAttached) {
+                        Log.d(TAG, "Host activity resumed - showing bubble")
+                        addBubble(a)
+                        pendingBubbleShow = false
+                    }
                 }
             }
-            override fun onActivityResumed(a: Activity) {
-                // Re-add bubble when coming back from background
-                if (a === browserActivityRef?.get() && isMinimized && !isBubbleAttached && !isPipHidden) {
-                    Log.d(TAG, "Browser resumed - re-adding bubble")
-                    addBubble(a)
+            override fun onActivityPaused(a: Activity) {
+                val isHost = a === hostActivityRef?.get()
+                Log.d(TAG, "onActivityPaused: ${a.javaClass.simpleName} isHost=$isHost isActive=$isActive isBubbleAttached=$isBubbleAttached")
+                if (isHost && isActive && isBubbleAttached) {
+                    Log.d(TAG, "Host activity paused - removing bubble to prevent leak")
+                    removeBubble()
                 }
             }
             override fun onActivityDestroyed(a: Activity) {
-                if (a === browserActivityRef?.get()) {
-                    Log.d(TAG, "Browser destroyed - cleaning up")
-                    removeBubble()
-                    removeLifecycleCallbacks()
-                    hiddenViews.clear()
-                    isMinimized = false
-                    isPipHidden = false
-                    browserActivityRef = null
-                    windowManager = null
+                val isHost = a === hostActivityRef?.get()
+                Log.d(TAG, "onActivityDestroyed: ${a.javaClass.simpleName} isHost=$isHost")
+                if (isHost) {
+                    Log.d(TAG, "Host activity destroyed - cleaning up")
+                    cleanup()
                 }
             }
             override fun onActivityCreated(a: Activity, b: Bundle?) {}
@@ -468,7 +379,7 @@ class SimulatedPipManager(
 
     private fun removeLifecycleCallbacks() {
         lifecycleCallbacks?.let {
-            val app = browserActivityRef?.get()?.application
+            val app = hostActivityRef?.get()?.application
                 ?: (context.applicationContext as? Application)
             app?.unregisterActivityLifecycleCallbacks(it)
             lifecycleCallbacks = null

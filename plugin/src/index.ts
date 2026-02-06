@@ -3,11 +3,12 @@ import { ConfigPlugin, withInfoPlist, withAndroidManifest } from "@expo/config-p
 interface ButtonConfigPluginProps {
   iosAppId: string;
   androidAppId: string;
+  supportsPictureInPicture?: boolean;
 }
 
 const withButtonConfig: ConfigPlugin<ButtonConfigPluginProps> = (
   config,
-  { iosAppId, androidAppId },
+  { iosAppId, androidAppId, supportsPictureInPicture = false },
 ) => {
   config = withInfoPlist(config, (config) => {
     config.modResults["ButtonSdkAppId"] = iosAppId;
@@ -32,12 +33,12 @@ const withButtonConfig: ConfigPlugin<ButtonConfigPluginProps> = (
       if (!mainApplication['meta-data']) {
         mainApplication['meta-data'] = [];
       }
-      
+
       // Check if it already exists to avoid duplicates
       const existingMeta = mainApplication['meta-data'].find(
         (item: any) => item.$['android:name'] === metaDataName
       );
-      
+
       if (!existingMeta) {
         mainApplication['meta-data'].push(metaDataElement);
       } else {
@@ -46,35 +47,66 @@ const withButtonConfig: ConfigPlugin<ButtonConfigPluginProps> = (
       }
     }
 
-    // Enable Picture-in-Picture support for the main activity
-    // We find the main activity by looking for the LAUNCHER category in intent-filters
-    // This is more robust than looking for ".MainActivity"
-    const mainActivity = mainApplication?.activity?.find((activity: any) => {
-      const intentFilters = activity['intent-filter'] || [];
-      return intentFilters.some((filter: any) => {
-        const categories = filter.category || [];
-        return categories.some((category: any) => 
-          category.$['android:name'] === 'android.intent.category.LAUNCHER'
-        );
-      });
-    });
-
-    if (mainActivity) {
-      mainActivity.$["android:supportsPictureInPicture"] = "true";
-      
-      // Ensure configuration changes are handled to prevent activity restart on PiP
-      const existingConfigChanges = mainActivity.$["android:configChanges"] || "";
-      const requiredChanges = ["smallestScreenSize", "screenLayout", "screenSize", "orientation"];
-      
-      // Filter out changes that are already present
-      const changesToAdd = requiredChanges.filter(change => 
-        !existingConfigChanges.includes(change)
+    // Only add PiP support when explicitly enabled
+    if (supportsPictureInPicture && mainApplication) {
+      // Add REORDER_TASKS permission
+      const manifest = config.modResults.manifest;
+      if (!manifest['uses-permission']) {
+        manifest['uses-permission'] = [];
+      }
+      const hasReorderPerm = manifest['uses-permission'].some(
+        (perm: any) => perm.$['android:name'] === 'android.permission.REORDER_TASKS'
       );
-      
-      if (changesToAdd.length > 0) {
-        mainActivity.$["android:configChanges"] = existingConfigChanges 
-          ? `${existingConfigChanges}|${changesToAdd.join("|")}`
-          : changesToAdd.join("|");
+      if (!hasReorderPerm) {
+        manifest['uses-permission'].push({
+          $: { 'android:name': 'android.permission.REORDER_TASKS' },
+        });
+      }
+
+      // Enable PiP on MainActivity
+      const mainActivity = mainApplication?.activity?.find((activity: any) => {
+        const intentFilters = activity['intent-filter'] || [];
+        return intentFilters.some((filter: any) => {
+          const categories = filter.category || [];
+          return categories.some((category: any) =>
+            category.$['android:name'] === 'android.intent.category.LAUNCHER'
+          );
+        });
+      });
+
+      if (mainActivity) {
+        mainActivity.$["android:supportsPictureInPicture"] = "true";
+
+        const existingConfigChanges = mainActivity.$["android:configChanges"] || "";
+        const requiredChanges = ["smallestScreenSize", "screenLayout", "screenSize", "orientation"];
+        const changesToAdd = requiredChanges.filter(change =>
+          !existingConfigChanges.includes(change)
+        );
+
+        if (changesToAdd.length > 0) {
+          mainActivity.$["android:configChanges"] = existingConfigChanges
+            ? `${existingConfigChanges}|${changesToAdd.join("|")}`
+            : changesToAdd.join("|");
+        }
+      }
+
+      // Add WebViewActivity override with PiP support
+      if (!mainApplication.activity) {
+        mainApplication.activity = [];
+      }
+      const webViewActivityName = 'com.usebutton.sdk.internal.WebViewActivity';
+      const existingWebView = mainApplication.activity.find(
+        (activity: any) => activity.$['android:name'] === webViewActivityName
+      );
+      if (!existingWebView) {
+        mainApplication.activity.push({
+          $: {
+            'android:name': webViewActivityName,
+            'android:supportsPictureInPicture': 'true',
+            'android:configChanges': 'screenSize|smallestScreenSize|screenLayout|orientation',
+            'tools:replace': 'android:supportsPictureInPicture,android:configChanges',
+          },
+        });
       }
     }
 

@@ -1,18 +1,2 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools">
-    
-    <!-- Permissions needed for PiP functionality -->
-    <uses-permission android:name="android.permission.REORDER_TASKS" />
-    
-    <application>
-        
-        <!-- Override Button SDK's WebViewActivity to support Picture-in-Picture -->
-        <activity
-            android:name="com.usebutton.sdk.internal.WebViewActivity"
-            android:supportsPictureInPicture="true"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
-            tools:replace="android:supportsPictureInPicture,android:configChanges" />
-            
-    </application>
-    
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 </manifest>

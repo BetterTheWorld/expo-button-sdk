@@ -51,7 +51,6 @@ class PictureInPictureManager(
     private var hideOnAppBackground = false
     private var isRestoringPip = false
     private var useNativePip = true
-    private var simulatedPipManager: SimulatedPipManager? = null
 
     init {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
@@ -79,10 +78,6 @@ class PictureInPictureManager(
             }
             hideOnAppBackground = config["hideOnAppBackground"] as? Boolean ?: false
             useNativePip = config["useNativePip"] as? Boolean ?: true
-        }
-
-        if (!useNativePip) {
-            simulatedPipManager = SimulatedPipManager(context, options, ::onSimulatedPipRestored)
         }
 
         val coverImage = options["coverImage"] as? Map<String, Any>
@@ -114,9 +109,9 @@ class PictureInPictureManager(
     }
 
     private fun onSimulatedPipRestored() {
+        // Called when user taps bubble to re-open browser
         isMinimized = false
         isPipHidden = false
-        delegate?.didRestore()
     }
 
     fun isPipActive(): Boolean {
@@ -213,7 +208,7 @@ class PictureInPictureManager(
 
     fun hidePip() {
         if (!useNativePip) {
-            simulatedPipManager?.hide()
+            ExpoButtonSdkModule.activeSimPipManager?.hide()
             return
         }
 
@@ -233,7 +228,7 @@ class PictureInPictureManager(
 
     fun showPip() {
         if (!useNativePip) {
-            simulatedPipManager?.show()
+            ExpoButtonSdkModule.activeSimPipManager?.show()
             return
         }
 
@@ -287,7 +282,7 @@ class PictureInPictureManager(
 
         if (!useNativePip) {
             isClosingForNewContent = true
-            simulatedPipManager?.closePipForNewContent()
+            ExpoButtonSdkModule.cleanupSimPip()
             isMinimized = false
             isClosingForNewContent = false
             onComplete()
@@ -432,19 +427,42 @@ class PictureInPictureManager(
         try {
             if (useNativePip) {
                 tryNativeAndroidPiP(targetActivity)
+                isAnimating = false
+                isMinimized = true
+                delegate?.didMinimize()
             } else {
                 val mainActivity = (context as? Activity)
-                if (mainActivity != null) {
-                    simulatedPipManager?.minimize(targetActivity, mainActivity)
-                } else {
+                if (mainActivity == null) {
                     Log.e("PictureInPictureManager", "Main activity not available for simulated PiP")
                     isAnimating = false
                     return
                 }
+
+                // Create persistent SimulatedPipManager on MainActivity
+                val simPip = SimulatedPipManager(context, options) {
+                    // On bubble tap: re-open browser
+                    Log.d("PictureInPictureManager", "Bubble tapped - reopening browser")
+                    onSimulatedPipRestored()
+                    ExpoButtonSdkModule.reopenFromSimPip()
+                }
+
+                // Store in module companion (survives browser close)
+                ExpoButtonSdkModule.activeSimPipManager = simPip
+                ExpoButtonSdkModule.isSimPipDismissing = true
+
+                // Enter persistent mode (bubble shows when mainActivity resumes)
+                simPip.enterPersistentMode(mainActivity)
+
+                isAnimating = false
+                isMinimized = true
+
+                // Dismiss browser - SDK will call onShouldClose → onClosed
+                val browser = originalBrowser
+                if (browser != null) {
+                    Log.d("PictureInPictureManager", "Dismissing browser for simulated PiP")
+                    browser.dismiss()
+                }
             }
-            isAnimating = false
-            isMinimized = true
-            delegate?.didMinimize()
         } catch (e: Exception) {
             Log.e("PictureInPictureManager", "Failed to enter PiP mode", e)
             isAnimating = false
@@ -607,7 +625,8 @@ class PictureInPictureManager(
         if (!isMinimized || isAnimating) return
 
         if (!useNativePip) {
-            simulatedPipManager?.restore()
+            // For persistent simulated PiP, bubble tap triggers reopen via callback
+            // This shouldn't normally be called directly
             return
         }
 
@@ -686,8 +705,7 @@ class PictureInPictureManager(
         stopPipModeChecker()
         hidePipOverlay()
         removeMainActivityLifecycleCallback()
-        simulatedPipManager?.cleanup()
-        simulatedPipManager = null
+        // Note: SimulatedPipManager is managed by ExpoButtonSdkModule companion, not cleaned here
         originalBrowser = null
         containerView = null
         isMinimized = false

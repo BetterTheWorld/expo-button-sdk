@@ -15,11 +15,30 @@ import java.lang.ref.WeakReference
 import android.webkit.URLUtil
 
 class ExpoButtonSdkModule() : Module() {
-  
-  // Keep reference to current PictureInPictureManager to close PiP on new purchase paths
+
   companion object {
     private var currentPictureInPictureManager: PictureInPictureManager? = null
     private var isNewPurchasePathStarting = false
+
+    // Persistent simulated PiP state (survives browser close)
+    var activeSimPipManager: SimulatedPipManager? = null
+    var isSimPipDismissing = false
+    private var simPipReopenFn: (() -> Unit)? = null
+
+    fun reopenFromSimPip() {
+      activeSimPipManager = null
+      isSimPipDismissing = false
+      val reopenFn = simPipReopenFn
+      simPipReopenFn = null
+      reopenFn?.invoke() // invoke AFTER nulling so launchPurchasePath can set the next one
+    }
+
+    fun cleanupSimPip() {
+      activeSimPipManager?.cleanup()
+      activeSimPipManager = null
+      simPipReopenFn = null
+      isSimPipDismissing = false
+    }
   }
 
   override fun definition() = ModuleDefinition {
@@ -40,12 +59,12 @@ class ExpoButtonSdkModule() : Module() {
       Log.d("ButtonSdk", "clearAllData")
       Button.clearAllData()
     }
-    
+
     Function("hidePip") {
       Log.d("ButtonSdk", "hidePip")
       currentPictureInPictureManager?.hidePip()
     }
-    
+
     Function("showPip") {
       Log.d("ButtonSdk", "showPip")
       currentPictureInPictureManager?.showPip()
@@ -58,7 +77,7 @@ class ExpoButtonSdkModule() : Module() {
       // Set flag that new purchase path is starting from React Native
       isNewPurchasePathStarting = true
       Log.d("ButtonSdk", "NEW PURCHASE PATH STARTING - Flag set to bypass exit modal")
-      
+
       // Safety reset after 5 seconds in case something fails
       Handler(Looper.getMainLooper()).postDelayed({
         if (isNewPurchasePathStarting) {
@@ -77,57 +96,66 @@ class ExpoButtonSdkModule() : Module() {
         }
       }
 
-      // URL validation with backwards compatibility
+      // Clean up any persistent simulated PiP
+      cleanupSimPip()
+
+      // URL validation
       if (url.isBlank()) {
         promise.reject("INVALID_URL", "URL cannot be blank", null)
         return@AsyncFunction
       }
 
-      // Validate URL format but allow edge cases for backwards compatibility
       if (!isValidUrlSafe(url)) {
         Log.w("ButtonSdk", "URL might be invalid but proceeding for backwards compatibility: $url")
       }
 
-      val request = PurchasePathRequest(url).apply {
-        token?.let {
-          Log.d("ButtonSdk", "startPurchasePath, token: $it")
-          this.pubRef = it
+      launchPurchasePath(params)
+      promise.resolve(null)
+    }
+  }
+
+  private fun launchPurchasePath(params: Map<String, Any>) {
+    // Store reopen function for simulated PiP (captures params for re-launch)
+    simPipReopenFn = { launchPurchasePath(params) }
+
+    val url = params["url"] as? String ?: return
+    val token = params["token"] as? String
+
+    val request = PurchasePathRequest(url).apply {
+      token?.let {
+        Log.d("ButtonSdk", "startPurchasePath, token: $it")
+        this.pubRef = it
+      }
+    }
+
+    Button.purchasePath().fetch(request, object : PurchasePathListener {
+      override fun onComplete(purchasePath: PurchasePath?, throwable: Throwable?) {
+        if (purchasePath != null) {
+          val activity = appContext.activityProvider?.currentActivity
+          if (activity != null) {
+            Button.purchasePath().extension = CustomPurchasePathExtension(activity, params, { promotionId ->
+              try {
+                val eventBody = Bundle().apply {
+                  putString("promotionId", promotionId)
+                }
+                sendEvent("onPromotionClick", eventBody)
+              } catch (e: Exception) {
+                Log.e("ButtonSdk", "Error sending promotion click event", e)
+              }
+            }, {
+              try {
+                sendEvent("onClose", Bundle())
+              } catch (e: Exception) {
+                Log.e("ButtonSdk", "Error sending close event", e)
+              }
+            })
+            purchasePath.start(activity)
+          }
+        } else {
+          Log.e("ButtonSdk", "Error fetching purchasePath", throwable)
         }
       }
-
-      Button.purchasePath().fetch(request, object : PurchasePathListener {
-        override fun onComplete(purchasePath: PurchasePath?, throwable: Throwable?) {
-          if (purchasePath != null) {
-            val activity = appContext.activityProvider?.currentActivity
-            if (activity != null) {
-              Button.purchasePath().extension = CustomPurchasePathExtension(activity, params, { promotionId ->
-                try {
-                  val eventBody = Bundle().apply {
-                    putString("promotionId", promotionId)
-                  }
-                  sendEvent("onPromotionClick", eventBody)
-                } catch (e: Exception) {
-                  Log.e("ButtonSdk", "Error sending promotion click event", e)
-                }
-              }, {
-                try {
-                  sendEvent("onClose", Bundle())
-                } catch (e: Exception) {
-                  Log.e("ButtonSdk", "Error sending close event", e)
-                }
-              })
-              purchasePath.start(activity)
-            } else {
-              promise.reject("ERROR", "No context for purchasePath", throwable)
-            }
-            promise.resolve(null)
-          } else {
-            Log.e("ButtonSdk", "Error fetching purchasePath", throwable)
-            promise.reject("ERROR", "Error fetching purchasePath", throwable)
-          }
-        }
-      })
-    }
+    })
   }
 
   class CustomPurchasePathExtension(
@@ -137,7 +165,6 @@ class ExpoButtonSdkModule() : Module() {
     private val onClose: () -> Unit
   ) : PurchasePathExtension {
 
-    // Use WeakReference to prevent memory leaks
     private val activityRef = WeakReference(activity)
 
     // Exit confirmation configuration
@@ -147,57 +174,50 @@ class ExpoButtonSdkModule() : Module() {
     private val stayButtonLabel: String
     private val leaveButtonLabel: String
     private val closeOnPromotionClick: Boolean
-    
+
     // Promotion labels
     private val promotionBadgeLabel: String
     private val promotionListTitle: String
     private val promotionBadgeFontSize: Float
-    
+
     // Promotion manager
     private var promotionManager: expo.modules.buttonsdk.promotion.PromotionManager? = null
-    
+
     // Picture in picture manager
     private var pictureInPictureManager: PictureInPictureManager? = null
-    
+
     init {
-      // Parse exit confirmation config
       val exitConfirmationConfig = options["exitConfirmation"] as? Map<String, Any>
       exitConfirmationEnabled = exitConfirmationConfig?.get("enabled") as? Boolean ?: false
       exitConfirmationTitle = exitConfirmationConfig?.get("title") as? String ?: "Are you sure you want to leave?"
       exitConfirmationMessage = exitConfirmationConfig?.get("message") as? String ?: "You may lose your progress and any available deals."
       stayButtonLabel = exitConfirmationConfig?.get("stayButtonLabel") as? String ?: "Stay"
       leaveButtonLabel = exitConfirmationConfig?.get("leaveButtonLabel") as? String ?: "Leave"
-      
-      // Parse closeOnPromotionClick option (default: true)
+
       closeOnPromotionClick = options["closeOnPromotionClick"] as? Boolean ?: true
-      
-      // Parse promotion label options
+
       promotionBadgeLabel = options["promotionBadgeLabel"] as? String ?: "Offers"
       promotionListTitle = options["promotionListTitle"] as? String ?: "Available Promotions"
       promotionBadgeFontSize = (options["promotionBadgeFontSize"] as? Number)?.toFloat() ?: 11f
-      
+
       // Initialize promotion manager if promotion data is provided
       val promotionData = options["promotionData"] as? Map<String, Any>
       if (promotionData != null) {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
           promotionManager = expo.modules.buttonsdk.promotion.PromotionManager(currentActivity, promotionData, { promotionId, browser ->
-            Log.d("CustomPurchasePathExtension", "🎯 Received promotion click: $promotionId")
+            Log.d("CustomPurchasePathExtension", "Received promotion click: $promotionId")
             onPromotionClick(promotionId)
-            Log.d("CustomPurchasePathExtension", "📤 Sent promotion event to TypeScript")
-            
+
             if (closeOnPromotionClick) {
-              Log.d("CustomPurchasePathExtension", "🚪 Closing browser (closeOnPromotionClick=true)")
               browser?.dismiss()
             } else {
-              Log.d("CustomPurchasePathExtension", "🔄 Browser stays open (closeOnPromotionClick=false)")
-              // Hide loader since we're not navigating to a new promotion
               GlobalLoaderManager.getInstance().hideLoader()
             }
           }, promotionBadgeLabel, promotionListTitle, promotionBadgeFontSize)
         }
       }
-      
+
       // Initialize picture in picture manager if configured
       val animationConfig = options["animationConfig"] as? Map<String, Any>
       val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
@@ -205,25 +225,19 @@ class ExpoButtonSdkModule() : Module() {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
           pictureInPictureManager = PictureInPictureManager(currentActivity, options)
-          currentPictureInPictureManager = pictureInPictureManager // Save reference
+          currentPictureInPictureManager = pictureInPictureManager
         }
       }
     }
 
     override fun onInitialized(browser: BrowserInterface) {
-      // Hide any global loader when new browser initializes
       GlobalLoaderManager.getInstance().hideLoader()
-      Log.d("CustomPurchasePathExtension", "🔄 Global loader hidden on browser initialization")
-      
-      
-      // Show pending promo code toast if available (no delay)
+
       promotionManager?.showPendingPromoCodeToast()
-      
+
       with(browser.header) {
         title.text = options["headerTitle"] as? String ?: ""
         subtitle.text = options["headerSubtitle"] as? String ?: ""
-
-        // Parse colors from hex strings
         title.color = parseColor(options["headerTitleColor"] as? String, Color.WHITE)
         subtitle.color = parseColor(options["headerSubtitleColor"] as? String, Color.WHITE)
         backgroundColor = parseColor(options["headerBackgroundColor"] as? String, Color.BLUE)
@@ -234,18 +248,15 @@ class ExpoButtonSdkModule() : Module() {
         backgroundColor = parseColor(options["footerBackgroundColor"] as? String, Color.BLUE)
         tintColor = parseColor(options["footerTintColor"] as? String, Color.BLUE)
       }
-      
+
       // Check if PiP is active and close it for new purchase path
       pictureInPictureManager?.let { pipManager ->
         if (pipManager.isPipActive()) {
-          Log.d("CustomPurchasePathExtension", "PiP is active, closing it for new purchase path")
-          pipManager.closePipAndProceed {
-            Log.d("CustomPurchasePathExtension", "PiP closed, continuing with browser setup")
-          }
+          pipManager.closePipAndProceed {}
         }
       }
-      
-      // Ensure pictureInPictureManager is created before setting up promotions
+
+      // Ensure pictureInPictureManager is created
       if (pictureInPictureManager == null) {
         val animationConfig = options["animationConfig"] as? Map<String, Any>
         val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
@@ -253,28 +264,20 @@ class ExpoButtonSdkModule() : Module() {
           val currentActivity = activityRef.get()
           if (currentActivity != null) {
             pictureInPictureManager = PictureInPictureManager(currentActivity, options)
-            currentPictureInPictureManager = pictureInPictureManager // Save reference
-            Log.d("CustomPurchasePathExtension", "PictureInPictureManager created in onInitialized")
+            currentPictureInPictureManager = pictureInPictureManager
           }
         }
       }
-      
-      // Setup promotions badge if available (now includes minimize button)
-      Log.d("CustomPurchasePathExtension", "About to setup promotions badge. PiP manager: ${if (pictureInPictureManager != null) "available" else "null"}")
-      Log.d("CustomPurchasePathExtension", "PromotionManager: ${if (promotionManager != null) "available" else "null"}")
-      
+
+      // Setup promotions badge and/or minimize button
       val promMgr = promotionManager
       val pipMgr = pictureInPictureManager
-      
+
       if (promMgr != null) {
-        // If we have a promotion manager, let it handle both buttons
         promMgr.setupPromotionsBadge(browser, pipMgr)
       } else if (pipMgr != null) {
-        // If no promotions but PiP is enabled, add just the minimize button
-        Log.d("CustomPurchasePathExtension", "No promotions, setting up standalone minimize button")
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
-          // Create container to position minimize button on the right
           val rightAlignedContainer = android.widget.LinearLayout(currentActivity).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL or android.view.Gravity.END
@@ -283,24 +286,21 @@ class ExpoButtonSdkModule() : Module() {
               android.widget.LinearLayout.LayoutParams.MATCH_PARENT
             )
           }
-          
+
           val minimizeButton = pipMgr.createMinimizeButton(currentActivity, browser)
           rightAlignedContainer.addView(minimizeButton)
-          
+
           try {
             browser.header.setCustomActionView(rightAlignedContainer)
-            Log.d("CustomPurchasePathExtension", "Standalone minimize button set successfully")
           } catch (e: Exception) {
             Log.e("CustomPurchasePathExtension", "Failed to set standalone minimize button", e)
           }
         }
       }
-      
-      // Setup picture in picture if available
+
       pictureInPictureManager?.addMinimizeButton(browser)
     }
 
-    // Helper function to parse color from hex string
     private fun parseColor(colorString: String?, defaultColor: Int): Int {
       return if (colorString != null) {
         try {
@@ -313,34 +313,34 @@ class ExpoButtonSdkModule() : Module() {
       }
     }
 
-    // Implement other required methods
     override fun onStartNavigate(browser: BrowserInterface) {}
     override fun onPageNavigate(browser: BrowserInterface, page: BrowserPage) {}
     override fun onProductNavigate(browser: BrowserInterface, page: ProductPage) {}
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
-    override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
-      Log.d("CustomPurchasePathExtension", "onShouldClose called, exitConfirmationEnabled: $exitConfirmationEnabled")
 
-      // Check if new purchase path is starting from React Native - ONLY skip modal for SYSTEM closure
-      if (isNewPurchasePathStarting) {
-        Log.d("CustomPurchasePathExtension", "NEW PURCHASE PATH STARTING - SYSTEM CLOSURE - SKIPPING EXIT MODAL")
-        isNewPurchasePathStarting = false // Reset flag immediately after use
-        return true // Allow closure without confirmation
+    override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
+      Log.d("CustomPurchasePathExtension", "onShouldClose called")
+
+      // Simulated PiP is dismissing the browser - allow it silently
+      if (isSimPipDismissing) {
+        Log.d("CustomPurchasePathExtension", "Simulated PiP dismissing - allowing close")
+        return true
       }
 
-      // For USER actions, show modal normally if PiP is active but NOT closing for new content
+      // New purchase path starting - allow system closure
+      if (isNewPurchasePathStarting) {
+        Log.d("CustomPurchasePathExtension", "New purchase path starting - allowing close")
+        isNewPurchasePathStarting = false
+        return true
+      }
+
+      // PiP closing for new content
       val pipManager = pictureInPictureManager ?: currentPictureInPictureManager
       if (pipManager != null && pipManager.isClosingForNewContent()) {
-        Log.d("CustomPurchasePathExtension", "PiP is closing for new content (SYSTEM), skipping exit confirmation")
-        return true // Allow closure without confirmation
+        return true
       }
 
-      // If PiP is just minimized but user is closing manually, SHOW the modal
-      if (pipManager != null && pipManager.isPipActive()) {
-        Log.d("CustomPurchasePathExtension", "PiP is active but USER is closing - SHOWING EXIT MODAL")
-        // Let it fall through to show modal
-      }
-
+      // Show exit confirmation if enabled
       if (exitConfirmationEnabled) {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
@@ -352,45 +352,53 @@ class ExpoButtonSdkModule() : Module() {
             leaveButtonLabel,
             browserInterface
           )
-          return false // Prevent automatic closure
+          return false
         }
       }
-      return true // Allow closure
+      return true
     }
 
     override fun onClosed() {
-      // Clean up references to prevent memory leaks
       try {
-        Log.d("CustomPurchasePathExtension", "Cleaning up resources")
+        Log.d("CustomPurchasePathExtension", "onClosed called, isSimPipDismissing=$isSimPipDismissing")
+
+        // Clean up promotions
         promotionManager?.cleanup()
         promotionManager = null
-        pictureInPictureManager?.cleanup()
-        pictureInPictureManager = null
-        GlobalLoaderManager.getInstance().hideLoader()
-        onClose()
+
+        if (isSimPipDismissing) {
+          // Browser was dismissed for simulated PiP - DON'T send close event
+          // DON'T clean up the persistent sim pip manager (it's in the module companion)
+          // Only clean up non-pip stuff
+          pictureInPictureManager?.cleanup()
+          pictureInPictureManager = null
+          GlobalLoaderManager.getInstance().hideLoader()
+          isSimPipDismissing = false
+          Log.d("CustomPurchasePathExtension", "Sim PiP dismiss cleanup done (no close event sent)")
+        } else {
+          // Normal close - clean up everything
+          pictureInPictureManager?.cleanup()
+          pictureInPictureManager = null
+          cleanupSimPip() // Also clean up any lingering sim pip
+          GlobalLoaderManager.getInstance().hideLoader()
+          onClose()
+        }
       } catch (e: Exception) {
         Log.e("CustomPurchasePathExtension", "Error during cleanup", e)
       }
     }
   }
 
-  // Safe URL validation function
   private fun isValidUrlSafe(url: String): Boolean {
     return try {
-      // Basic URL validation that allows for edge cases
       when {
         url.isBlank() -> false
-        url.startsWith("http://") || url.startsWith("https://") -> {
-          // Use URLUtil for more permissive validation
-          URLUtil.isValidUrl(url)
-        }
-        // Allow custom schemes for backwards compatibility
+        url.startsWith("http://") || url.startsWith("https://") -> URLUtil.isValidUrl(url)
         url.contains("://") -> true
         else -> false
       }
     } catch (e: Exception) {
-      Log.w("ButtonSdk", "URL validation failed, allowing for backwards compatibility", e)
-      true // Be permissive for backwards compatibility
+      true
     }
   }
 }

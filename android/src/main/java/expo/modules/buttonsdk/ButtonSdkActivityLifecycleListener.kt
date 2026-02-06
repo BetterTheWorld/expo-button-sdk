@@ -1,10 +1,11 @@
 package expo.modules.buttonsdk
 
 import android.app.Activity
+import android.app.Application
 import android.content.pm.PackageManager
+import android.provider.Settings
 import android.util.Log
 import expo.modules.core.interfaces.ApplicationLifecycleListener
-import android.app.Application
 import android.content.Context
 import android.os.Bundle
 
@@ -14,6 +15,9 @@ import com.usebutton.sdk.BuildConfig
 import expo.modules.core.interfaces.ReactActivityLifecycleListener
 
 class ButtonSdkActivityLifecycleListener(activityContext: Context) : ReactActivityLifecycleListener {
+
+    private var activityDiagnosticCallbacks: Application.ActivityLifecycleCallbacks? = null
+
     override fun onCreate(activity: Activity, savedInstanceState: Bundle?) {
         // Debugging enabled (do not include in production)
         if (BuildConfig.DEBUG) {
@@ -28,6 +32,47 @@ class ButtonSdkActivityLifecycleListener(activityContext: Context) : ReactActivi
             Button.configure(activity, it) // Assuming Button.configure can accept Context
             Log.i("ButtonSdkActivityLifecycleListener", "Button SDK configured with App ID: $it")
         } ?: Log.e("ButtonSdkActivityLifecycleListener", "Button SDK App ID not found in AndroidManifest.xml")
+
+        // DIAGNOSTIC: Register global activity lifecycle monitor
+        if (activityDiagnosticCallbacks == null) {
+            activityDiagnosticCallbacks = object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityCreated(a: Activity, b: Bundle?) {
+                    Log.w("LIFECYCLE-DIAG", "🟢 CREATED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivityStarted(a: Activity) {
+                    Log.w("LIFECYCLE-DIAG", "🔵 STARTED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivityResumed(a: Activity) {
+                    Log.w("LIFECYCLE-DIAG", "🟣 RESUMED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivityPaused(a: Activity) {
+                    Log.w("LIFECYCLE-DIAG", "🟡 PAUSED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivityStopped(a: Activity) {
+                    Log.w("LIFECYCLE-DIAG", "🟠 STOPPED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivitySaveInstanceState(a: Activity, b: Bundle) {
+                    Log.w("LIFECYCLE-DIAG", "💾 SAVE_STATE: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+                override fun onActivityDestroyed(a: Activity) {
+                    Log.w("LIFECYCLE-DIAG", "🔴 DESTROYED: ${a.javaClass.simpleName} finishing=${a.isFinishing}")
+                }
+            }
+            activity.application.registerActivityLifecycleCallbacks(activityDiagnosticCallbacks)
+            Log.w("LIFECYCLE-DIAG", "📊 Diagnostic lifecycle monitor registered")
+
+            // Check ALWAYS_FINISH_ACTIVITIES
+            try {
+                val alwaysFinish = Settings.Global.getInt(
+                    activity.contentResolver,
+                    Settings.Global.ALWAYS_FINISH_ACTIVITIES,
+                    0
+                )
+                Log.w("LIFECYCLE-DIAG", "⚠️ ALWAYS_FINISH_ACTIVITIES = $alwaysFinish (1 means 'Don't keep activities' is ON)")
+            } catch (e: Exception) {
+                Log.w("LIFECYCLE-DIAG", "Could not check ALWAYS_FINISH_ACTIVITIES", e)
+            }
+        }
     }
 
     private fun getAppIdFromManifest(context: Context): String? {
