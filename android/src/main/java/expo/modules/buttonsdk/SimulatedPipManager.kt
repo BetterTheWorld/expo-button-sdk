@@ -67,6 +67,7 @@ class SimulatedPipManager(
     private var pipChevronHeight: Int? = null
     private var pipChevronStrokeWidth: Float = 0f
     private var pipCloseStrokeWidth: Float = 0f
+    private var pipTapToRestore: Boolean = true
     private var earnTextMargin: Int = dpToPx(8)
 
     // Drag state
@@ -115,6 +116,7 @@ class SimulatedPipManager(
             (config["pipChevronHeight"] as? Number)?.let { pipChevronHeight = dpToPx(it.toInt()) }
             (config["pipChevronStrokeWidth"] as? Number)?.let { pipChevronStrokeWidth = it.toFloat() * context.resources.displayMetrics.density }
             (config["pipCloseStrokeWidth"] as? Number)?.let { pipCloseStrokeWidth = it.toFloat() * context.resources.displayMetrics.density }
+            (config["pipTapToRestore"] as? Boolean)?.let { pipTapToRestore = it }
             (config["earnTextMargin"] as? Number)?.let { earnTextMargin = dpToPx(it.toInt()) }
             Log.d(TAG, "Config parsed — chevronSize=$pipChevronSize chevronHeight=$pipChevronHeight closeSize=$pipCloseButtonSize chevronStroke=$pipChevronStrokeWidth closeStroke=$pipCloseStrokeWidth fontSize=$earnTextFontSize inset=$pipOverlayInset earnMargin=$earnTextMargin")
         }
@@ -244,24 +246,36 @@ class SimulatedPipManager(
             bubble.addView(iv)
         }
 
-        // Close button (X) — top-left
+        // Close button (X) — top-left — min 48dp hit area
+        val closeHitSize = maxOf(pipCloseButtonSize, dpToPx(48))
         bubble.addView(ImageView(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(pipCloseButtonSize, pipCloseButtonSize).apply {
+            layoutParams = FrameLayout.LayoutParams(closeHitSize, closeHitSize).apply {
                 gravity = Gravity.TOP or Gravity.START
-                topMargin = pipOverlayInset; leftMargin = pipOverlayInset
+                topMargin = pipOverlayInset - (closeHitSize - pipCloseButtonSize) / 2
+                leftMargin = pipOverlayInset - (closeHitSize - pipCloseButtonSize) / 2
             }
+            setPadding((closeHitSize - pipCloseButtonSize) / 2, (closeHitSize - pipCloseButtonSize) / 2,
+                       (closeHitSize - pipCloseButtonSize) / 2, (closeHitSize - pipCloseButtonSize) / 2)
             setImageDrawable(createCloseDrawable(chevronColor))
+            scaleType = ImageView.ScaleType.FIT_CENTER
             setOnClickListener { onCloseTapped() }
         })
 
-        // Chevron-up — top-right (height auto from width scale: w * 10/18)
+        // Chevron-up — top-right — min 48dp hit area
         val chevronH = pipChevronHeight ?: (pipChevronSize * 10f / 18f).toInt()
+        val chevronHitW = maxOf(pipChevronSize, dpToPx(48))
+        val chevronHitH = maxOf(chevronH, dpToPx(48))
         bubble.addView(ImageView(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(pipChevronSize, chevronH).apply {
+            layoutParams = FrameLayout.LayoutParams(chevronHitW, chevronHitH).apply {
                 gravity = Gravity.TOP or Gravity.END
-                topMargin = pipOverlayInset; rightMargin = pipOverlayInset
+                topMargin = pipOverlayInset - (chevronHitH - chevronH) / 2
+                rightMargin = pipOverlayInset - (chevronHitW - pipChevronSize) / 2
             }
+            setPadding((chevronHitW - pipChevronSize) / 2, (chevronHitH - chevronH) / 2,
+                       (chevronHitW - pipChevronSize) / 2, (chevronHitH - chevronH) / 2)
             setImageDrawable(createChevronUpDrawable(chevronColor))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setOnClickListener { onBubbleTapped() }
         })
 
         if (!earnText.isNullOrEmpty()) {
@@ -330,7 +344,7 @@ class SimulatedPipManager(
                 }
                 MotionEvent.ACTION_UP -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
-                    if (!isDragging) onBubbleTapped() else snapToEdge(view)
+                    if (!isDragging && pipTapToRestore) onBubbleTapped() else if (isDragging) snapToEdge(view)
                     isDragging = false; true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -485,6 +499,7 @@ class SimulatedPipManager(
             }
             override fun draw(canvas: Canvas) {
                 val b = getBounds()
+                if (b.width() <= 0 || b.height() <= 0) return
                 val sx = b.width() / 13f; val sy = b.height() / 13f
                 if (pipCloseStrokeWidth > 0) paint.strokeWidth = pipCloseStrokeWidth / sx
                 canvas.save(); canvas.translate(b.left.toFloat(), b.top.toFloat()); canvas.scale(sx, sy)
@@ -527,6 +542,7 @@ class SimulatedPipManager(
             }
             override fun draw(canvas: Canvas) {
                 val b = getBounds()
+                if (b.width() <= 0 || b.height() <= 0) return
                 val s = b.width() / 18f
                 if (pipChevronStrokeWidth > 0) paint.strokeWidth = pipChevronStrokeWidth / s
                 val pathW = 18f * s; val pathH = 10f * s

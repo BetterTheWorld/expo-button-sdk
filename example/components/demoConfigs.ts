@@ -379,6 +379,7 @@ export const DEMO_CONFIGS: DemoConfig[] = [
       animationConfig: {
         pictureInPicture: {
           enabled: true,
+          pipTapToRestore: false,
           useNativePip: false,
           size: { width: fw(170), height: fh(104) },
           chevronColor: "#005E9D",

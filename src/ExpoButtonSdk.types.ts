@@ -91,6 +91,13 @@ export interface PictureInPictureConfig {
    * @default 0 */
   pipCloseStrokeWidth?: number;
   /**
+   * When true, tapping anywhere on the PiP floating window restores the browser.
+   * When false, only tapping the chevron restores and only the X closes.
+   * The rest of the PiP surface is drag-only.
+   * @default true
+   */
+  pipTapToRestore?: boolean;
+  /**
    * Android only: When true, PiP will hide when app goes to background
    * and restore when app comes back to foreground.
    * @platform android

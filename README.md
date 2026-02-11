@@ -129,6 +129,7 @@ startPurchasePath({
       pipChevronHeight: 10,       // Height of the chevron icon (default: auto, based on chevronSize)
       pipChevronStrokeWidth: 0.4, // Extra stroke to make chevron bolder (default: 0)
       pipCloseStrokeWidth: 0.1,   // Extra stroke to make X bolder (default: 0)
+      pipTapToRestore: false,     // Only chevron restores, only X closes (default: true)
 
       // Earn label overlay on minimized PiP
       earnText: "Earn 2%",
@@ -183,6 +184,7 @@ startPurchasePath({
 | `pipChevronHeight` | iOS & simulated Android | auto | Height of the chevron icon. If not set, defaults to `pipChevronSize * 10/18` |
 | `pipChevronStrokeWidth` | iOS & simulated Android | `0` | Extra stroke width for the chevron to make it bolder. `0` = original FA6 Regular weight |
 | `pipCloseStrokeWidth` | iOS & simulated Android | `0` | Extra stroke width for the close (X) to make it bolder. `0` = original FA6 Regular weight |
+| `pipTapToRestore` | iOS & simulated Android | `true` | When `true`, tapping anywhere on the PiP restores the browser. When `false`, only the chevron restores and only the X closes — the rest is drag-only |
 | `earnText` | All | — | Text displayed on minimized PiP overlay |
 | `earnTextColor` | All | `"#FFFFFF"` | Color of earn text |
 | `earnTextBackgroundColor` | All | — | Background color of earn text label |

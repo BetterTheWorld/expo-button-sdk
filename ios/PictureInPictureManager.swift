@@ -31,6 +31,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var pipChevronHeight: CGFloat? = nil
     private var pipChevronStrokeWidth: CGFloat = 0
     private var pipCloseStrokeWidth: CGFloat = 0
+    private var pipTapToRestore: Bool = true
     private var coverImageScaleType: UIView.ContentMode = .scaleAspectFill
     private var coverImageBackgroundColor: UIColor = .clear
     private var coverImagePadding: CGFloat = 0
@@ -95,6 +96,9 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             }
             if let sw = pipConfig["pipCloseStrokeWidth"] as? NSNumber {
                 self.pipCloseStrokeWidth = CGFloat(sw.doubleValue)
+            }
+            if let tapRestore = pipConfig["pipTapToRestore"] as? Bool {
+                self.pipTapToRestore = tapRestore
             }
             if let margin = pipConfig["earnTextMargin"] as? NSNumber {
                 self.earnTextMargin = CGFloat(margin.doubleValue)
@@ -278,6 +282,10 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         }
     }
     
+    @objc private func chevronButtonTapped() {
+        restoreFromPiP()
+    }
+
     @objc private func closeButtonTapped() {
         // Close PIP and browser completely
         cleanup()
@@ -502,17 +510,15 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private func setupPiPGestures(for view: UIView) {
         // Pan gesture for dragging (primary gesture)
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        
-        // Tap gesture to restore (single tap)
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(minimizedBrowserTapped))
-        tapGesture.numberOfTapsRequired = 1
-        
-        // Configure gesture interactions
-        // Tap should fail if there's any significant pan movement
-        tapGesture.require(toFail: panGesture)
-        
         view.addGestureRecognizer(panGesture)
-        view.addGestureRecognizer(tapGesture)
+
+        if self.pipTapToRestore {
+            // Tap gesture to restore (single tap) — only if pipTapToRestore is true
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(minimizedBrowserTapped))
+            tapGesture.numberOfTapsRequired = 1
+            tapGesture.require(toFail: panGesture)
+            view.addGestureRecognizer(tapGesture)
+        }
     }
     
     @objc private func minimizedBrowserTapped() {
@@ -554,9 +560,9 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             let translation = gesture.translation(in: nil)
             let distance = sqrt(translation.x * translation.x + translation.y * translation.y)
             
-            if distance < 10 {
+            if distance < 10 && self.pipTapToRestore {
                 // Minimal movement - treat as tap, restore PiP
-                
+
                 UIView.animate(withDuration: 0.15, animations: {
                     pipWindow.transform = .identity
                     pipWindow.layer.shadowOpacity = 0.3
@@ -565,6 +571,14 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                     self.isDragging = false
                     self.restoreFromPiP()
                 }
+            } else if distance < 10 {
+                // Minimal movement but tap-to-restore disabled — just reset visual
+                UIView.animate(withDuration: 0.15) {
+                    pipWindow.transform = .identity
+                    pipWindow.layer.shadowOpacity = 0.3
+                    pipWindow.layer.shadowRadius = 8
+                }
+                self.isDragging = false
             } else {
                 // Significant movement - complete the drag
                 let finalFrame = snapToEdges(currentFrame: pipWindow.frame)
@@ -697,14 +711,18 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         let inset = self.pipOverlayInset
 
         // Close button (X) — top-left — SVG viewBox 0 0 13 13
+        // Minimum 44x44 hit area per Apple HIG
         let closeSize = self.pipCloseButtonSize
+        let closeHitSize = max(closeSize, 44)
         let closeBtn = UIButton(type: .custom)
-        closeBtn.frame = CGRect(x: inset, y: inset, width: closeSize, height: closeSize)
+        closeBtn.frame = CGRect(x: inset - (closeHitSize - closeSize) / 2,
+                                y: inset - (closeHitSize - closeSize) / 2,
+                                width: closeHitSize, height: closeHitSize)
         closeBtn.backgroundColor = .clear
         closeBtn.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
 
         let xLayer = CAShapeLayer()
-        xLayer.frame = CGRect(x: 0, y: 0, width: closeSize, height: closeSize)
+        xLayer.frame = CGRect(x: (closeHitSize - closeSize) / 2, y: (closeHitSize - closeSize) / 2, width: closeSize, height: closeSize)
         let xPath = UIBezierPath()
         xPath.move(to: CGPoint(x: 0.351563, y: 11.0156))
         xPath.addLine(to: CGPoint(x: 5.03906, y: 6.32812))
@@ -737,18 +755,24 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         self.closeButton = closeBtn
 
         // Chevron-up — top-right — FA6 Pro Regular, viewBox 18x10, filled
+        // Minimum 44x44 hit area per Apple HIG
         let chevronScale: CGFloat = self.pipChevronSize / 18.0
         let chevronW: CGFloat = self.pipChevronSize
         let chevronH: CGFloat = self.pipChevronHeight ?? (10.0 * chevronScale)
+        let chevronHitW = max(chevronW, 44)
+        let chevronHitH = max(chevronH, 44)
         let pathW: CGFloat = 18.0 * chevronScale
         let pathH: CGFloat = 10.0 * chevronScale
         let offsetX: CGFloat = (chevronW - pathW) / 2.0
         let offsetY: CGFloat = (chevronH - pathH) / 2.0
-        let chevronUp = UIView()
-        chevronUp.frame = CGRect(x: size.width - chevronW - inset, y: inset, width: chevronW, height: chevronH)
+        let chevronUp = UIButton(type: .custom)
+        chevronUp.frame = CGRect(x: size.width - chevronHitW - inset + (chevronHitW - chevronW) / 2,
+                                 y: inset - (chevronHitH - chevronH) / 2,
+                                 width: chevronHitW, height: chevronHitH)
         chevronUp.backgroundColor = .clear
+        chevronUp.addTarget(self, action: #selector(chevronButtonTapped), for: .touchUpInside)
         let chevronUpLayer = CAShapeLayer()
-        chevronUpLayer.frame = CGRect(x: 0, y: 0, width: chevronW, height: chevronH)
+        chevronUpLayer.frame = CGRect(x: (chevronHitW - chevronW) / 2, y: (chevronHitH - chevronH) / 2, width: chevronW, height: chevronH)
         let chevronUpPath = UIBezierPath()
         chevronUpPath.move(to: CGPoint(x: 7.89062, y: 0.351562))
         chevronUpPath.addCurve(to: CGPoint(x: 9.17969, y: 0.351562), controlPoint1: CGPoint(x: 8.24219, y: 0), controlPoint2: CGPoint(x: 8.82812, y: 0))
