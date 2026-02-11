@@ -201,18 +201,12 @@ export function validatePictureInPictureConfig(config?: PictureInPictureConfig):
       errors.push('pictureInPicture.size.height must be a positive number');
     }
     
-    // Reasonable size limits
+    // Upper bound only — small sizes are valid for PiP windows
     if (config.size.width > 1000) {
       errors.push('pictureInPicture.size.width must be less than 1000px');
     }
     if (config.size.height > 1000) {
       errors.push('pictureInPicture.size.height must be less than 1000px');
-    }
-    if (config.size.width < 100) {
-      errors.push('pictureInPicture.size.width must be at least 100px');
-    }
-    if (config.size.height < 100) {
-      errors.push('pictureInPicture.size.height must be at least 100px');
     }
   }
   
