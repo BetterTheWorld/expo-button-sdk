@@ -24,11 +24,11 @@ let currentHeaderButtonListener: any = null;
 let currentCloseListener: any = null;
 
 export async function startPurchasePath(options: StartPurchasePathOptions) {
-  // Validate PictureInPicture config first
+  // Validate PictureInPicture config (warn only — never block the browser from opening)
   if (options.animationConfig?.pictureInPicture) {
     const validation = validatePictureInPictureConfig(options.animationConfig.pictureInPicture);
     if (!validation.isValid) {
-      throw new Error(`Invalid PictureInPicture configuration: ${validation.errors.join(', ')}`);
+      console.warn(`[ButtonSDK] PictureInPicture config warnings: ${validation.errors.join(', ')}`);
     }
   }
 

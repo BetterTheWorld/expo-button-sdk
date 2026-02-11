@@ -25,7 +25,8 @@ import java.lang.ref.WeakReference
 class SimulatedPipManager(
     private val context: Context,
     private val options: Map<String, Any>,
-    private val onReopen: (() -> Unit)? = null
+    private val onReopen: (() -> Unit)? = null,
+    private val onClose: (() -> Unit)? = null
 ) {
 
     companion object {
@@ -49,11 +50,25 @@ class SimulatedPipManager(
     private var chevronColor: Int = Color.WHITE
     private var earnText: String? = null
     private var earnTextColor: Int = Color.WHITE
-    private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
+    private var earnTextBackgroundColor: Int? = null
+    private var earnTextFontFamily: String? = null
+    private var earnTextFontSize: Float = 12f
+    private var earnTextFontWeight: Int = 600
+    private var earnTextLineHeight: Int? = null
     private var coverImageUri: String? = null
     private var coverImageScaleType: ImageView.ScaleType = ImageView.ScaleType.CENTER_CROP
     private var coverImageBackgroundColor: Int = Color.TRANSPARENT
     private var coverImagePadding: Int = 0
+    private var coverImageWidth: Int? = null
+    private var coverImageHeight: Int? = null
+    private var pipOverlayInset: Int = dpToPx(8)
+    private var pipCloseButtonSize: Int = dpToPx(20)
+    private var pipChevronSize: Int = dpToPx(20)
+    private var pipChevronHeight: Int? = null
+    private var pipChevronStrokeWidth: Float = 0f
+    private var pipCloseStrokeWidth: Float = 0f
+    private var pipTapToRestore: Boolean = true
+    private var earnTextMargin: Int = dpToPx(8)
 
     // Drag state
     private var isDragging = false
@@ -86,6 +101,24 @@ class SimulatedPipManager(
             earnText = config["earnText"] as? String
             (config["earnTextColor"] as? String)?.let { try { earnTextColor = Color.parseColor(it) } catch (_: Exception) {} }
             (config["earnTextBackgroundColor"] as? String)?.let { try { earnTextBackgroundColor = Color.parseColor(it) } catch (_: Exception) {} }
+            earnTextFontFamily = config["earnTextFontFamily"] as? String
+            (config["earnTextFontSize"] as? Number)?.let { earnTextFontSize = it.toFloat() }
+            (config["earnTextFontWeight"] as? String)?.let {
+                earnTextFontWeight = when (it.lowercase()) {
+                    "normal" -> 400; "bold" -> 700
+                    else -> it.toIntOrNull() ?: 600
+                }
+            }
+            (config["earnTextLineHeight"] as? Number)?.let { earnTextLineHeight = dpToPx(it.toInt()) }
+            (config["pipOverlayInset"] as? Number)?.let { pipOverlayInset = dpToPx(it.toInt()) }
+            (config["pipCloseButtonSize"] as? Number)?.let { pipCloseButtonSize = dpToPx(it.toInt()) }
+            (config["pipChevronSize"] as? Number)?.let { pipChevronSize = dpToPx(it.toInt()) }
+            (config["pipChevronHeight"] as? Number)?.let { pipChevronHeight = dpToPx(it.toInt()) }
+            (config["pipChevronStrokeWidth"] as? Number)?.let { pipChevronStrokeWidth = it.toFloat() * context.resources.displayMetrics.density }
+            (config["pipCloseStrokeWidth"] as? Number)?.let { pipCloseStrokeWidth = it.toFloat() * context.resources.displayMetrics.density }
+            (config["pipTapToRestore"] as? Boolean)?.let { pipTapToRestore = it }
+            (config["earnTextMargin"] as? Number)?.let { earnTextMargin = dpToPx(it.toInt()) }
+            Log.d(TAG, "Config parsed — chevronSize=$pipChevronSize chevronHeight=$pipChevronHeight closeSize=$pipCloseButtonSize chevronStroke=$pipChevronStrokeWidth closeStroke=$pipCloseStrokeWidth fontSize=$earnTextFontSize inset=$pipOverlayInset earnMargin=$earnTextMargin")
         }
 
         val coverImage = options["coverImage"] as? Map<String, Any>
@@ -101,6 +134,8 @@ class SimulatedPipManager(
         }
         (coverImage?.get("backgroundColor") as? String)?.let { try { coverImageBackgroundColor = Color.parseColor(it) } catch (_: Exception) {} }
         (coverImage?.get("padding") as? Number)?.let { coverImagePadding = dpToPx(it.toInt()) }
+        (coverImage?.get("width") as? Number)?.let { coverImageWidth = dpToPx(it.toInt()) }
+        (coverImage?.get("height") as? Number)?.let { coverImageHeight = dpToPx(it.toInt()) }
     }
 
     fun isActive(): Boolean = isActive
@@ -196,37 +231,87 @@ class SimulatedPipManager(
         }
 
         if (coverImageUri != null) {
+            val imgW = coverImageWidth ?: FrameLayout.LayoutParams.MATCH_PARENT
+            val imgH = coverImageHeight ?: FrameLayout.LayoutParams.MATCH_PARENT
             val iv = ImageView(activity).apply {
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ).apply { setMargins(coverImagePadding, coverImagePadding, coverImagePadding, coverImagePadding) }
+                layoutParams = FrameLayout.LayoutParams(imgW, imgH).apply {
+                    gravity = Gravity.CENTER
+                    if (coverImageWidth == null && coverImageHeight == null) {
+                        setMargins(coverImagePadding, coverImagePadding, coverImagePadding, coverImagePadding)
+                    }
+                }
                 scaleType = coverImageScaleType
             }
             loadImageFromUrl(coverImageUri!!, iv)
             bubble.addView(iv)
         }
 
+        // Close button (X) — top-left — min 48dp hit area
+        val closeHitSize = maxOf(pipCloseButtonSize, dpToPx(48))
         bubble.addView(ImageView(activity).apply {
-            val s = dpToPx(20)
-            layoutParams = FrameLayout.LayoutParams(s, s).apply {
-                gravity = Gravity.TOP or Gravity.END
-                topMargin = dpToPx(8); rightMargin = dpToPx(8)
+            layoutParams = FrameLayout.LayoutParams(closeHitSize, closeHitSize).apply {
+                gravity = Gravity.TOP or Gravity.START
+                topMargin = pipOverlayInset - (closeHitSize - pipCloseButtonSize) / 2
+                leftMargin = pipOverlayInset - (closeHitSize - pipCloseButtonSize) / 2
             }
+            setPadding((closeHitSize - pipCloseButtonSize) / 2, (closeHitSize - pipCloseButtonSize) / 2,
+                       (closeHitSize - pipCloseButtonSize) / 2, (closeHitSize - pipCloseButtonSize) / 2)
+            setImageDrawable(createCloseDrawable(chevronColor))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setOnClickListener { onCloseTapped() }
+        })
+
+        // Chevron-up — top-right — min 48dp hit area
+        val chevronH = pipChevronHeight ?: (pipChevronSize * 10f / 18f).toInt()
+        val chevronHitW = maxOf(pipChevronSize, dpToPx(48))
+        val chevronHitH = maxOf(chevronH, dpToPx(48))
+        bubble.addView(ImageView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(chevronHitW, chevronHitH).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = pipOverlayInset - (chevronHitH - chevronH) / 2
+                rightMargin = pipOverlayInset - (chevronHitW - pipChevronSize) / 2
+            }
+            setPadding((chevronHitW - pipChevronSize) / 2, (chevronHitH - chevronH) / 2,
+                       (chevronHitW - pipChevronSize) / 2, (chevronHitH - chevronH) / 2)
             setImageDrawable(createChevronUpDrawable(chevronColor))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setOnClickListener { onBubbleTapped() }
         })
 
         if (!earnText.isNullOrEmpty()) {
             bubble.addView(TextView(activity).apply {
-                text = earnText; setTextColor(earnTextColor); textSize = 12f
+                text = earnText; setTextColor(earnTextColor); textSize = earnTextFontSize
+                // Apply font family or system font with weight
+                val baseFace = earnTextFontFamily?.let { fontFamily ->
+                    try {
+                        android.graphics.Typeface.createFromAsset(activity.assets, "fonts/$fontFamily.ttf")
+                    } catch (_: Exception) {
+                        try {
+                            android.graphics.Typeface.createFromAsset(activity.assets, "fonts/$fontFamily.otf")
+                        } catch (_: Exception) { null }
+                    }
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    typeface = android.graphics.Typeface.create(baseFace, earnTextFontWeight, false)
+                } else {
+                    typeface = android.graphics.Typeface.create(baseFace, if (earnTextFontWeight >= 700) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                }
+                // Apply line height
+                earnTextLineHeight?.let { lh ->
+                    if (android.os.Build.VERSION.SDK_INT >= 28) { setLineHeight(lh) }
+                    else { setLineSpacing(lh - textSize, 1f) }
+                }
                 setPadding(dpToPx(8), dpToPx(4), dpToPx(8), dpToPx(4))
-                background = GradientDrawable().apply {
-                    setColor(earnTextBackgroundColor); cornerRadius = dpToPx(4).toFloat()
+                val bgColor = earnTextBackgroundColor
+                if (bgColor != null) {
+                    background = GradientDrawable().apply {
+                        setColor(bgColor); cornerRadius = dpToPx(4).toFloat()
+                    }
                 }
                 layoutParams = FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT,
                     FrameLayout.LayoutParams.WRAP_CONTENT
-                ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; bottomMargin = dpToPx(8) }
+                ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; bottomMargin = earnTextMargin }
             })
         }
 
@@ -259,7 +344,7 @@ class SimulatedPipManager(
                 }
                 MotionEvent.ACTION_UP -> {
                     view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
-                    if (!isDragging) onBubbleTapped() else snapToEdge(view)
+                    if (!isDragging && pipTapToRestore) onBubbleTapped() else if (isDragging) snapToEdge(view)
                     isDragging = false; true
                 }
                 MotionEvent.ACTION_CANCEL -> {
@@ -290,6 +375,12 @@ class SimulatedPipManager(
             pendingBubbleShow = false
             onReopen?.invoke()
         }
+    }
+
+    private fun onCloseTapped() {
+        Log.d(TAG, "Close button tapped - closing PIP completely")
+        cleanup()
+        onClose?.invoke()
     }
 
     private fun snapToEdge(view: View) {
@@ -398,23 +489,85 @@ class SimulatedPipManager(
 
     // --- Drawing helpers ---
 
-    private fun createChevronUpDrawable(color: Int): Drawable {
+    // Close X — SVG viewBox 0 0 13 13, filled path
+    private fun createCloseDrawable(color: Int): Drawable {
         return object : Drawable() {
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color; style = Paint.Style.STROKE
-                strokeWidth = dpToPx(2).toFloat(); strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND
+                this.color = color
+                style = if (pipCloseStrokeWidth > 0) Paint.Style.FILL_AND_STROKE else Paint.Style.FILL
+                strokeJoin = Paint.Join.ROUND
             }
             override fun draw(canvas: Canvas) {
-                val b = getBounds(); val cx = b.centerX().toFloat(); val cy = b.centerY().toFloat()
-                val s = dpToPx(6).toFloat(); val path = Path()
-                path.moveTo(cx - s, cy + s * 0.4f); path.lineTo(cx, cy - s * 0.4f); path.lineTo(cx + s, cy + s * 0.4f)
-                canvas.drawPath(path, paint)
+                val b = getBounds()
+                if (b.width() <= 0 || b.height() <= 0) return
+                val sx = b.width() / 13f; val sy = b.height() / 13f
+                if (pipCloseStrokeWidth > 0) paint.strokeWidth = pipCloseStrokeWidth / sx
+                canvas.save(); canvas.translate(b.left.toFloat(), b.top.toFloat()); canvas.scale(sx, sy)
+                val p = Path()
+                p.moveTo(0.351563f, 11.0156f)
+                p.lineTo(5.03906f, 6.32812f)
+                p.lineTo(0.390626f, 1.67969f)
+                p.cubicTo(0f, 1.32812f, 0f, 0.742186f, 0.390626f, 0.390624f)
+                p.cubicTo(0.742189f, 0f, 1.32813f, 0f, 1.67969f, 0.390624f)
+                p.lineTo(6.36719f, 5.03906f)
+                p.lineTo(11.0156f, 0.390625f)
+                p.cubicTo(11.3672f, 0f, 11.9531f, 0f, 12.3047f, 0.390625f)
+                p.cubicTo(12.6953f, 0.742187f, 12.6953f, 1.32812f, 12.3047f, 1.71875f)
+                p.lineTo(7.65625f, 6.36719f)
+                p.lineTo(12.3047f, 11.0156f)
+                p.cubicTo(12.6953f, 11.3672f, 12.6953f, 11.9531f, 12.3047f, 12.3437f)
+                p.cubicTo(11.9531f, 12.6953f, 11.3672f, 12.6953f, 10.9766f, 12.3437f)
+                p.lineTo(6.32813f, 7.65625f)
+                p.lineTo(1.67969f, 12.3047f)
+                p.cubicTo(1.32813f, 12.6953f, 0.742188f, 12.6953f, 0.351563f, 12.3047f)
+                p.cubicTo(0f, 11.9531f, 0f, 11.3672f, 0.351563f, 11.0156f)
+                p.close()
+                canvas.drawPath(p, paint); canvas.restore()
             }
             override fun setAlpha(a: Int) { paint.alpha = a }
             override fun setColorFilter(cf: ColorFilter?) { paint.colorFilter = cf }
             override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
-            override fun getIntrinsicWidth(): Int = dpToPx(16)
-            override fun getIntrinsicHeight(): Int = dpToPx(16)
+            override fun getIntrinsicWidth(): Int = -1
+            override fun getIntrinsicHeight(): Int = -1
+        }
+    }
+
+    // Chevron-up — FA6 Pro Regular, viewBox 18x10, filled, uniform scale
+    private fun createChevronUpDrawable(color: Int): Drawable {
+        return object : Drawable() {
+            private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                style = if (pipChevronStrokeWidth > 0) Paint.Style.FILL_AND_STROKE else Paint.Style.FILL
+                strokeJoin = Paint.Join.ROUND
+            }
+            override fun draw(canvas: Canvas) {
+                val b = getBounds()
+                if (b.width() <= 0 || b.height() <= 0) return
+                val s = b.width() / 18f
+                if (pipChevronStrokeWidth > 0) paint.strokeWidth = pipChevronStrokeWidth / s
+                val pathW = 18f * s; val pathH = 10f * s
+                val ox = b.left + (b.width() - pathW) / 2f
+                val oy = b.top + (b.height() - pathH) / 2f
+                canvas.save(); canvas.translate(ox, oy); canvas.scale(s, s)
+                val p = Path()
+                p.moveTo(7.89062f, 0.351562f)
+                p.cubicTo(8.24219f, 0f, 8.82812f, 0f, 9.17969f, 0.351562f)
+                p.lineTo(16.7188f, 7.85156f)
+                p.cubicTo(17.0703f, 8.24219f, 17.0703f, 8.82812f, 16.7188f, 9.17969f)
+                p.cubicTo(16.3281f, 9.57031f, 15.7422f, 9.57031f, 15.3906f, 9.17969f)
+                p.lineTo(8.55469f, 2.34375f)
+                p.lineTo(1.71875f, 9.17969f)
+                p.cubicTo(1.32812f, 9.57031f, 0.742188f, 9.57031f, 0.390625f, 9.17969f)
+                p.cubicTo(0f, 8.82812f, 0f, 8.24219f, 0.390625f, 7.89062f)
+                p.lineTo(7.89062f, 0.351562f)
+                p.close()
+                canvas.drawPath(p, paint); canvas.restore()
+            }
+            override fun setAlpha(a: Int) { paint.alpha = a }
+            override fun setColorFilter(cf: ColorFilter?) { paint.colorFilter = cf }
+            override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+            override fun getIntrinsicWidth(): Int = -1
+            override fun getIntrinsicHeight(): Int = -1
         }
     }
 

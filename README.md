@@ -112,26 +112,41 @@ startPurchasePath({
     pictureInPicture: {
       enabled: true,
 
-      // iOS Only: Custom initial position and size
+      // Use simulated PiP on Android (default: true for native PiP)
+      useNativePip: false,
+
+      // Custom initial position and size (iOS & simulated Android)
       position: { x: 20, y: 100 },
       size: { width: 150, height: 200 },
 
-      // Chevron color (iOS & Android)
+      // Overlay button colors (iOS & simulated Android)
       chevronColor: "#FFFFFF",
 
-      // Earn label overlay on minimized PiP (iOS & Android)
+      // Overlay button sizing & styling
+      pipOverlayInset: 10,        // Inset from PiP window edges (default: 10pt iOS / 8dp Android)
+      pipCloseButtonSize: 20,     // Size of the close (X) button (default: 20)
+      pipChevronSize: 15,         // Width of the chevron icon (default: 15pt iOS / 20dp Android)
+      pipChevronHeight: 10,       // Height of the chevron icon (default: auto, based on chevronSize)
+      pipChevronStrokeWidth: 0.4, // Extra stroke to make chevron bolder (default: 0)
+      pipCloseStrokeWidth: 0.1,   // Extra stroke to make X bolder (default: 0)
+      pipTapToRestore: false,     // Only chevron restores, only X closes (default: true)
+
+      // Earn label overlay on minimized PiP
       earnText: "Earn 2%",
       earnTextColor: "#FFFFFF",
       earnTextBackgroundColor: "#99000000",
+      earnTextFontFamily: "OpenSans-SemiBold", // Must be bundled in host app
+      earnTextFontSize: 14,                     // Default: 12
+      earnTextFontWeight: "600",                // "100"-"900", "normal", "bold"
+      earnTextLineHeight: 16,                   // Default: auto
+      earnTextMargin: 8,                        // Bottom margin from PiP edge (default: 28pt iOS / 8dp Android)
 
-      // Android only: Aspect ratio for native PiP window
+      // Android native PiP only
       androidAspectRatio: { width: 3, height: 2 },
-
-      // Android only: Auto-hide PiP when app goes to background
-      hideOnAppBackground: true
+      hideOnAppBackground: true,
     }
   },
-  
+
   // Optional: Cover image for the minimized PiP window (iOS & Android)
   coverImage: {
     uri: "https://example.com/logo.png",
@@ -139,12 +154,14 @@ startPurchasePath({
     // source: "local_asset_name" (iOS only)
     // OR
     // base64: "..." (iOS only)
-    
-    scaleType: "cover", // "cover" | "contain" | "center" | "stretch"
-    backgroundColor: "#FFFFFF", // Background color visible with padding or transparent images
-    padding: 8 // Subtle padding around the image (points on iOS, dp on Android)
+
+    scaleType: "cover",          // "cover" | "contain" | "center" | "stretch"
+    backgroundColor: "#FFFFFF",  // Background color visible with padding or transparent images
+    padding: 8,                  // Padding around the image (points on iOS, dp on Android)
+    width: 120,                  // Explicit image width (optional, fills available space by default)
+    height: 80,                  // Explicit image height (optional, fills available space by default)
   },
-  
+
   // Optional: Callback when browser is closed
   onClose: () => {
     console.log('Browser closed');
@@ -154,33 +171,49 @@ startPurchasePath({
 
 #### PiP Options
 
-| Option | Platform | Description |
-|--------|----------|-------------|
-| `enabled` | iOS & Android | Enable PiP mode |
-| `position` | iOS only | Initial position `{ x, y }` |
-| `size` | iOS only | Initial size `{ width, height }` |
-| `chevronColor` | iOS & Android | Color of the minimize/maximize chevron |
-| `earnText` | iOS & Android | Text displayed on minimized PiP overlay |
-| `earnTextColor` | iOS & Android | Color of earn text |
-| `earnTextBackgroundColor` | iOS & Android | Background color of earn text label |
-| `androidAspectRatio` | Android only | Aspect ratio for native PiP `{ width, height }` (e.g., `{ width: 3, height: 2 }`) |
-| `hideOnAppBackground` | Android only | When `true`, automatically hides PiP when the app goes to background and restores it when returning to foreground (default: `false`) |
+| Option | Platform | Default | Description |
+|--------|----------|---------|-------------|
+| `enabled` | All | — | Enable PiP mode |
+| `useNativePip` | Android | `true` | When `false`, uses a simulated draggable floating overlay instead of the native Android PiP API |
+| `position` | iOS & simulated Android | — | Initial position `{ x, y }` |
+| `size` | iOS & simulated Android | — | Initial size `{ width, height }` |
+| `chevronColor` | iOS & simulated Android | `"#FFFFFF"` | Color of the close (X) and chevron icons |
+| `pipOverlayInset` | iOS & simulated Android | `10` (iOS) / `8` (Android) | Inset/padding of overlay buttons from PiP window edges |
+| `pipCloseButtonSize` | iOS & simulated Android | `20` | Size of the close (X) button in points/dp |
+| `pipChevronSize` | iOS & simulated Android | `15` (iOS) / `20` (Android) | Width of the chevron icon in points/dp |
+| `pipChevronHeight` | iOS & simulated Android | auto | Height of the chevron icon. If not set, defaults to `pipChevronSize * 10/18` |
+| `pipChevronStrokeWidth` | iOS & simulated Android | `0` | Extra stroke width for the chevron to make it bolder. `0` = original FA6 Regular weight |
+| `pipCloseStrokeWidth` | iOS & simulated Android | `0` | Extra stroke width for the close (X) to make it bolder. `0` = original FA6 Regular weight |
+| `pipTapToRestore` | iOS & simulated Android | `true` | When `true`, tapping anywhere on the PiP restores the browser. When `false`, only the chevron restores and only the X closes — the rest is drag-only |
+| `earnText` | All | — | Text displayed on minimized PiP overlay |
+| `earnTextColor` | All | `"#FFFFFF"` | Color of earn text |
+| `earnTextBackgroundColor` | All | — | Background color of earn text label |
+| `earnTextFontFamily` | iOS & simulated Android | system font | Font family for earn text. Must be a font bundled in the host app (e.g., `"OpenSans-SemiBold"`) |
+| `earnTextFontSize` | iOS & simulated Android | `12` | Font size for earn text |
+| `earnTextFontWeight` | iOS & simulated Android | `"600"` | Font weight: `"normal"`, `"bold"`, or numeric `"100"`–`"900"` |
+| `earnTextLineHeight` | iOS & simulated Android | auto | Line height for earn text |
+| `earnTextMargin` | iOS & simulated Android | `28` (iOS) / `8` (Android) | Bottom margin of earn text from PiP window edge |
+| `androidAspectRatio` | Android native PiP | — | Aspect ratio for native PiP window `{ width, height }` |
+| `hideOnAppBackground` | Android native PiP | `false` | Auto-hide PiP when app goes to background |
 
 #### Cover Image Options
 
-| Option | Platform | Description |
-|--------|----------|-------------|
-| `uri` | iOS & Android | Remote image URL |
-| `source` | iOS only | Local asset name |
-| `base64` | iOS only | Base64 encoded image |
-| `scaleType` | iOS & Android | Image scaling: `cover`, `contain`, `center`, `stretch` |
-| `backgroundColor` | iOS & Android | Background color (visible with padding or transparent images) |
-| `padding` | iOS & Android | Padding around the image in points/dp |
+| Option | Platform | Default | Description |
+|--------|----------|---------|-------------|
+| `uri` | iOS & Android | — | Remote image URL |
+| `source` | iOS only | — | Local asset name |
+| `base64` | iOS only | — | Base64 encoded image data |
+| `scaleType` | iOS & Android | `"cover"` | Image scaling: `cover`, `contain`, `center`, `stretch` |
+| `backgroundColor` | iOS & Android | transparent | Background color (visible with padding or transparent images) |
+| `padding` | iOS & Android | `0` | Padding around the image in points/dp |
+| `width` | iOS & Android | auto | Explicit width for the image. If not set, fills available space minus padding |
+| `height` | iOS & Android | auto | Explicit height for the image. If not set, fills available space minus padding |
 
 #### Platform Differences
 
-- **iOS**: Custom floating window with cover image, earn label, and chevron overlay. Tap anywhere to restore.
-- **Android**: Native system PiP with cover image and earn label overlay. Uses system controls to restore. With `hideOnAppBackground: true`, the PiP window automatically hides when the user leaves the app (e.g., pressing home) and reappears when returning.
+- **iOS**: Custom floating window with cover image, close button (X), chevron-up, and earn label overlays. Tap chevron or PiP area to restore. Tap X to close completely. Draggable.
+- **Android (simulated, `useNativePip: false`)**: Floating overlay with the same behavior as iOS — close button, chevron, earn label, draggable.
+- **Android (native, `useNativePip: true`)**: Native system PiP with cover image and earn label overlay. Uses system controls. With `hideOnAppBackground: true`, PiP auto-hides when leaving the app and reappears when returning.
 
 #### Programmatic PiP Control
 

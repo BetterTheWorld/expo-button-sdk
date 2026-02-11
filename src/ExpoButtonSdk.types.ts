@@ -50,7 +50,53 @@ export interface PictureInPictureConfig {
   earnText?: string;
   earnTextColor?: string;
   earnTextBackgroundColor?: string;
+  /** Font family for the earn text label. Must be a font bundled in the host app.
+   * Example: "OpenSans-SemiBold"
+   * @default system font */
+  earnTextFontFamily?: string;
+  /** Font size for the earn text label.
+   * @default 12 */
+  earnTextFontSize?: number;
+  /** Font weight for the earn text label. Uses CSS-style numeric values.
+   * "normal"=400, "bold"=700, or numeric "100"-"900".
+   * Ignored if earnTextFontFamily already includes weight (e.g. "OpenSans-SemiBold").
+   * @default "600" */
+  earnTextFontWeight?: string;
+  /** Line height for the earn text label.
+   * @default auto */
+  earnTextLineHeight?: number;
+  /** Bottom margin of the earn text label from the PIP window bottom edge.
+   * @default 28 (iOS points) / 8 (Android dp) */
+  earnTextMargin?: number;
   androidAspectRatio?: AndroidAspectRatio;
+  /** Inset/padding of overlay buttons (close, chevron) from PIP window edges.
+   * @default 10 (iOS points) / 8 (Android dp) */
+  pipOverlayInset?: number;
+  /** Size of the close (X) button in the PIP window.
+   * @default 20 (iOS points) / 20 (Android dp) */
+  pipCloseButtonSize?: number;
+  /** Width of the chevron icon in the PIP window.
+   * @default 15 (iOS points) / 20 (Android dp) */
+  pipChevronSize?: number;
+  /** Height of the chevron icon in the PIP window.
+   * If not set, defaults to pipChevronSize * 10/18.
+   * @default auto */
+  pipChevronHeight?: number;
+  /** Extra stroke width for the chevron icon to make it bolder.
+   * 0 = original FA6 Regular weight. Higher values = thicker.
+   * @default 0 */
+  pipChevronStrokeWidth?: number;
+  /** Extra stroke width for the close (X) icon to make it bolder.
+   * 0 = original FA6 Regular weight. Higher values = thicker.
+   * @default 0 */
+  pipCloseStrokeWidth?: number;
+  /**
+   * When true, tapping anywhere on the PiP floating window restores the browser.
+   * When false, only tapping the chevron restores and only the X closes.
+   * The rest of the PiP surface is drag-only.
+   * @default true
+   */
+  pipTapToRestore?: boolean;
   /**
    * Android only: When true, PiP will hide when app goes to background
    * and restore when app comes back to foreground.
@@ -82,6 +128,10 @@ export interface CoverImageConfig {
   scaleType?: 'cover' | 'contain' | 'center' | 'stretch';
   backgroundColor?: string;
   padding?: number;
+  /** Explicit width for the image inside the PIP window. If not set, fills available space minus padding. */
+  width?: number;
+  /** Explicit height for the image inside the PIP window. If not set, fills available space minus padding. */
+  height?: number;
 }
 
 export interface StartPurchasePathOptions {
@@ -151,18 +201,12 @@ export function validatePictureInPictureConfig(config?: PictureInPictureConfig):
       errors.push('pictureInPicture.size.height must be a positive number');
     }
     
-    // Reasonable size limits
+    // Upper bound only — small sizes are valid for PiP windows
     if (config.size.width > 1000) {
       errors.push('pictureInPicture.size.width must be less than 1000px');
     }
     if (config.size.height > 1000) {
       errors.push('pictureInPicture.size.height must be less than 1000px');
-    }
-    if (config.size.width < 100) {
-      errors.push('pictureInPicture.size.width must be at least 100px');
-    }
-    if (config.size.height < 100) {
-      errors.push('pictureInPicture.size.height must be at least 100px');
     }
   }
   

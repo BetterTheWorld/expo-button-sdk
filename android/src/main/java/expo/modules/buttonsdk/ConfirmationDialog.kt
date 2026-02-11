@@ -21,6 +21,8 @@ import android.util.TypedValue
 import com.usebutton.sdk.purchasepath.BrowserInterface
 
 object ConfirmationDialog {
+    private const val DIALOG_TAG = "exit_confirmation_dialog"
+
     fun showExitConfirmationAlert(
         context: Context,
         browser: BrowserInterface,
@@ -53,14 +55,21 @@ object ConfirmationDialog {
         Handler(Looper.getMainLooper()).post {
             try {
                 val container = browser.viewContainer
-                
+
                 if (container == null) {
                     Log.e("ConfirmationDialog", "Could not get view container from browser")
                     return@post
                 }
 
+                // Prevent stacking — if a dialog is already showing, ignore
+                if (container.findViewWithTag<View>(DIALOG_TAG) != null) {
+                    Log.d("ConfirmationDialog", "Dialog already visible, ignoring duplicate")
+                    return@post
+                }
+
                 val dialogView = createDialogView(context, title, message, stayButtonLabel, leaveButtonLabel, browser, container)
-                
+                dialogView.tag = DIALOG_TAG
+
                 // Add to container
                 container.addView(dialogView)
                 Log.d("ConfirmationDialog", "Dialog overlay added successfully")

@@ -32,6 +32,7 @@ class PictureInPictureManager(
     private var isButtonHidden = false
     private var isClosingForNewContent = false
     private var chevronColor: Int = Color.WHITE
+    private var headerTintColor: Int = Color.WHITE
     private var earnText: String? = null
     private var earnTextColor: Int = Color.WHITE
     private var earnTextBackgroundColor: Int = Color.parseColor("#99000000")
@@ -53,6 +54,8 @@ class PictureInPictureManager(
     private var useNativePip = true
 
     init {
+        (options["headerTintColor"] as? String)?.let { try { headerTintColor = Color.parseColor(it) } catch (_: Exception) {} }
+
         val animationConfig = options["animationConfig"] as? Map<String, Any>
         val pipConfig = animationConfig?.get("pictureInPicture") as? Map<String, Any>
         pipConfig?.let { config ->
@@ -382,7 +385,7 @@ class PictureInPictureManager(
             }
             setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            val chevronDrawable = createChevronDownDrawableForHeader(chevronColor)
+            val chevronDrawable = createChevronDownDrawableForHeader(headerTintColor)
             setImageDrawable(chevronDrawable)
         }
 
@@ -439,12 +442,19 @@ class PictureInPictureManager(
                 }
 
                 // Create persistent SimulatedPipManager on MainActivity
-                val simPip = SimulatedPipManager(context, options) {
-                    // On bubble tap: re-open browser
-                    Log.d("PictureInPictureManager", "Bubble tapped - reopening browser")
-                    onSimulatedPipRestored()
-                    ExpoButtonSdkModule.reopenFromSimPip()
-                }
+                val simPip = SimulatedPipManager(context, options,
+                    onReopen = {
+                        // On bubble tap: re-open browser
+                        Log.d("PictureInPictureManager", "Bubble tapped - reopening browser")
+                        onSimulatedPipRestored()
+                        ExpoButtonSdkModule.reopenFromSimPip()
+                    },
+                    onClose = {
+                        // On close button: clean up completely
+                        Log.d("PictureInPictureManager", "Close button tapped - full cleanup")
+                        ExpoButtonSdkModule.cleanupSimPip()
+                    }
+                )
 
                 // Store in module companion (survives browser close)
                 ExpoButtonSdkModule.activeSimPipManager = simPip
@@ -641,7 +651,7 @@ class PictureInPictureManager(
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = color
                 style = Paint.Style.STROKE
-                strokeWidth = dpToPx(3).toFloat()
+                strokeWidth = dpToPx(2).toFloat()
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
@@ -652,9 +662,9 @@ class PictureInPictureManager(
                 val centerY = bounds.centerY().toFloat()
                 val size = dpToPx(7).toFloat()
                 val path = Path()
-                path.moveTo(centerX - size, centerY - size * 0.4f)
-                path.lineTo(centerX, centerY + size * 0.4f)
-                path.lineTo(centerX + size, centerY - size * 0.4f)
+                path.moveTo(centerX - size, centerY - size * 0.5f)
+                path.lineTo(centerX, centerY + size * 0.5f)
+                path.lineTo(centerX + size, centerY - size * 0.5f)
                 canvas.drawPath(path, paint)
             }
 

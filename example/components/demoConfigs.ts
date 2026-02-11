@@ -1,8 +1,15 @@
-import { Alert } from "react-native";
+import { Alert, Dimensions } from "react-native";
 import type { StartPurchasePathOptions } from "@flipgive/expo-button-sdk";
 import { MOCK_PROMOTION_DATA } from "../../src/constants/MockData";
 
 const TOKEN = process.env.EXPO_PUBLIC_BUTON_SDK_TOKEN_EXAMPLE ?? "";
+
+// Figma frame: 375x812 (standard iPhone)
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+const figmaScale = (figmaPx: number, figmaBase: number, screenBase: number) =>
+  Math.round(screenBase * (figmaPx / figmaBase));
+const fw = (px: number) => figmaScale(px, 375, screenWidth);
+const fh = (px: number) => figmaScale(px, 812, screenHeight);
 
 export interface DemoConfig {
   id: string;
@@ -352,6 +359,60 @@ export const DEMO_CONFIGS: DemoConfig[] = [
         uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff",
         scaleType: "center",
         backgroundColor: "white",
+      },
+    },
+  },
+  {
+    id: "pip-ulta",
+    title: "PiP Figma Style",
+    options: {
+      url: "https://www.adidas.com/us",
+      token: TOKEN,
+      headerBackgroundColor: "#074A7B",
+      headerTintColor: "#FFFFFF",
+      headerTitle: "ULTA Beauty",
+      headerTitleColor: "#FFFFFF",
+      headerSubtitle: "Earn 2%",
+      headerSubtitleColor: "#B3D4FC",
+      footerBackgroundColor: "#074A7B",
+      footerTintColor: "#FFFFFF",
+      animationConfig: {
+        pictureInPicture: {
+          enabled: true,
+          pipTapToRestore: false,
+          useNativePip: false,
+          size: { width: fw(170), height: fh(104) },
+          chevronColor: "#005E9D",
+          earnText: "Earn 2%",
+          earnTextColor: "#143860",
+          earnTextFontFamily: "OpenSans-SemiBold",
+          earnTextFontSize: 13,
+          earnTextFontWeight: "500",
+          earnTextLineHeight: 16,
+          pipOverlayInset: 12,
+          pipCloseButtonSize: 13,
+          pipChevronSize: 17,
+          pipChevronHeight: 16,
+          pipChevronStrokeWidth: 0.4,
+          pipCloseStrokeWidth: 0.1,
+          earnTextMargin: 2.5,
+        },
+      },
+      coverImage: {
+        uri: "https://placecats.com/millie_neo/300/200",
+        scaleType: "contain",
+        backgroundColor: "#FFFFFF",
+        padding: 22,
+      },
+      exitConfirmation: {
+        enabled: true,
+        title: "Are you sure you want to leave?",
+        message: "You might miss out on exclusive offers.",
+        stayButtonLabel: "Stay",
+        leaveButtonLabel: "Leave",
+      },
+      onClose: () => {
+        // Alert.alert("Browser closed");
       },
     },
   },
