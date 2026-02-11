@@ -13,14 +13,29 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     private var containerView: UIView?
     private var isButtonHidden: Bool = false
     private var chevronColor: UIColor = .white
+    private var headerTintColor: UIColor = .white
     private var earnText: String?
     private var earnTextColor: UIColor = .white
-    private var earnTextBackgroundColor: UIColor = UIColor.black.withAlphaComponent(0.6)
+    private var earnTextBackgroundColor: UIColor? = nil
+    private var earnTextFontFamily: String? = nil
+    private var earnTextFontSize: CGFloat = 12
+    private var earnTextFontWeight: UIFont.Weight = .semibold
+    private var earnTextLineHeight: CGFloat? = nil
     private var earnLabel: UILabel?
+    private var earnTextMargin: CGFloat = 28
     private var chevronUpView: UIView?
+    private var closeButton: UIView?
+    private var pipOverlayInset: CGFloat = 10
+    private var pipCloseButtonSize: CGFloat = 20
+    private var pipChevronSize: CGFloat = 15
+    private var pipChevronHeight: CGFloat? = nil
+    private var pipChevronStrokeWidth: CGFloat = 0
+    private var pipCloseStrokeWidth: CGFloat = 0
     private var coverImageScaleType: UIView.ContentMode = .scaleAspectFill
     private var coverImageBackgroundColor: UIColor = .clear
     private var coverImagePadding: CGFloat = 0
+    private var coverImageWidth: CGFloat? = nil
+    private var coverImageHeight: CGFloat? = nil
     
     private var isDragging: Bool = false
     private var dragStartLocation: CGPoint = .zero
@@ -32,7 +47,11 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     init(options: [String: Any]) {
         self.options = options
         super.init()
-        
+
+        if let tintColor = options["headerTintColor"] as? String {
+            self.headerTintColor = UIColor(hex: tintColor) ?? .white
+        }
+
         if let animationConfig = options["animationConfig"] as? [String: Any],
            let pipConfig = animationConfig["pictureInPicture"] as? [String: Any] {
             if let colorString = pipConfig["chevronColor"] as? String {
@@ -45,8 +64,50 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
                 self.earnTextColor = UIColor(hex: textColorString) ?? .white
             }
             if let bgColorString = pipConfig["earnTextBackgroundColor"] as? String {
-                self.earnTextBackgroundColor = UIColor(hex: bgColorString) ?? UIColor.black.withAlphaComponent(0.6)
+                self.earnTextBackgroundColor = UIColor(hex: bgColorString)
             }
+            if let fontFamily = pipConfig["earnTextFontFamily"] as? String {
+                self.earnTextFontFamily = fontFamily
+            }
+            if let fontSize = pipConfig["earnTextFontSize"] as? NSNumber {
+                self.earnTextFontSize = CGFloat(fontSize.doubleValue)
+            }
+            if let weight = pipConfig["earnTextFontWeight"] as? String {
+                self.earnTextFontWeight = Self.parseFontWeight(weight)
+            }
+            if let lineHeight = pipConfig["earnTextLineHeight"] as? NSNumber {
+                self.earnTextLineHeight = CGFloat(lineHeight.doubleValue)
+            }
+            if let inset = pipConfig["pipOverlayInset"] as? NSNumber {
+                self.pipOverlayInset = CGFloat(inset.doubleValue)
+            }
+            if let closeSize = pipConfig["pipCloseButtonSize"] as? NSNumber {
+                self.pipCloseButtonSize = CGFloat(closeSize.doubleValue)
+            }
+            if let chevSize = pipConfig["pipChevronSize"] as? NSNumber {
+                self.pipChevronSize = CGFloat(chevSize.doubleValue)
+            }
+            if let chevH = pipConfig["pipChevronHeight"] as? NSNumber {
+                self.pipChevronHeight = CGFloat(chevH.doubleValue)
+            }
+            if let sw = pipConfig["pipChevronStrokeWidth"] as? NSNumber {
+                self.pipChevronStrokeWidth = CGFloat(sw.doubleValue)
+            }
+            if let sw = pipConfig["pipCloseStrokeWidth"] as? NSNumber {
+                self.pipCloseStrokeWidth = CGFloat(sw.doubleValue)
+            }
+            if let margin = pipConfig["earnTextMargin"] as? NSNumber {
+                self.earnTextMargin = CGFloat(margin.doubleValue)
+            }
+            NSLog("[PiPManager] Config parsed — chevronSize=%.1f chevronHeight=%@ closeSize=%.1f chevronStroke=%.2f closeStroke=%.2f fontSize=%.1f inset=%.1f earnMargin=%.1f",
+                  self.pipChevronSize,
+                  self.pipChevronHeight.map { String(format: "%.1f", $0) } ?? "auto",
+                  self.pipCloseButtonSize,
+                  self.pipChevronStrokeWidth,
+                  self.pipCloseStrokeWidth,
+                  self.earnTextFontSize,
+                  self.pipOverlayInset,
+                  self.earnTextMargin)
         }
         
         if let coverImage = options["coverImage"] as? [String: Any] {
@@ -69,6 +130,12 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             }
             if let padding = coverImage["padding"] as? NSNumber {
                 self.coverImagePadding = CGFloat(padding.doubleValue)
+            }
+            if let w = coverImage["width"] as? NSNumber {
+                self.coverImageWidth = CGFloat(w.doubleValue)
+            }
+            if let h = coverImage["height"] as? NSNumber {
+                self.coverImageHeight = CGFloat(h.doubleValue)
             }
         }
     }
@@ -110,26 +177,26 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         chevronView.backgroundColor = .clear
         chevronView.translatesAutoresizingMaskIntoConstraints = false
         chevronView.isUserInteractionEnabled = false
-        
+
         let chevronLayer = CAShapeLayer()
         let chevronPath = UIBezierPath()
         chevronPath.move(to: CGPoint(x: 0, y: 0))
-        chevronPath.addLine(to: CGPoint(x: chevronSize / 2, y: chevronSize * 0.4))
+        chevronPath.addLine(to: CGPoint(x: chevronSize / 2, y: chevronSize * 0.5))
         chevronPath.addLine(to: CGPoint(x: chevronSize, y: 0))
         chevronLayer.path = chevronPath.cgPath
-        chevronLayer.strokeColor = self.chevronColor.cgColor
+        chevronLayer.strokeColor = self.headerTintColor.cgColor
         chevronLayer.fillColor = UIColor.clear.cgColor
-        chevronLayer.lineWidth = 3.0
+        chevronLayer.lineWidth = 2.0
         chevronLayer.lineCap = .round
         chevronLayer.lineJoin = .round
         chevronView.layer.addSublayer(chevronLayer)
-        
+
         minimizeButton.addSubview(chevronView)
         NSLayoutConstraint.activate([
             chevronView.centerXAnchor.constraint(equalTo: minimizeButton.centerXAnchor),
             chevronView.centerYAnchor.constraint(equalTo: minimizeButton.centerYAnchor),
             chevronView.widthAnchor.constraint(equalToConstant: chevronSize),
-            chevronView.heightAnchor.constraint(equalToConstant: chevronSize * 0.6)
+            chevronView.heightAnchor.constraint(equalToConstant: chevronSize * 0.55)
         ])
         
         // Get existing custom action view (deals button) if any
@@ -211,6 +278,12 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         }
     }
     
+    @objc private func closeButtonTapped() {
+        // Close PIP and browser completely
+        cleanup()
+        delegate?.didRestore()
+    }
+
     @objc private func minimizeButtonTapped() {
         if !isMinimized {
             minimizeToPiP()
@@ -385,6 +458,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
             }
             self.earnLabel?.alpha = 0.0
             self.chevronUpView?.alpha = 0.0
+            self.closeButton?.alpha = 0.0
             
             // Fade in browser simultaneously
             browserVC.view.alpha = 1.0
@@ -589,11 +663,13 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         
         let imageView = UIImageView()
         let padding = self.coverImagePadding
+        let imgW = self.coverImageWidth ?? (size.width - padding * 2)
+        let imgH = self.coverImageHeight ?? (size.height - padding * 2)
         imageView.frame = CGRect(
-            x: padding,
-            y: padding,
-            width: size.width - (padding * 2),
-            height: size.height - (padding * 2)
+            x: (size.width - imgW) / 2,
+            y: (size.height - imgH) / 2,
+            width: imgW,
+            height: imgH
         )
         imageView.contentMode = self.coverImageScaleType
         imageView.clipsToBounds = true
@@ -618,39 +694,123 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
     }
     
     private func setupPipOverlays(in containerView: UIView, size: CGSize) {
+        let inset = self.pipOverlayInset
+
+        // Close button (X) — top-left — SVG viewBox 0 0 13 13
+        let closeSize = self.pipCloseButtonSize
+        let closeBtn = UIButton(type: .custom)
+        closeBtn.frame = CGRect(x: inset, y: inset, width: closeSize, height: closeSize)
+        closeBtn.backgroundColor = .clear
+        closeBtn.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
+
+        let xLayer = CAShapeLayer()
+        xLayer.frame = CGRect(x: 0, y: 0, width: closeSize, height: closeSize)
+        let xPath = UIBezierPath()
+        xPath.move(to: CGPoint(x: 0.351563, y: 11.0156))
+        xPath.addLine(to: CGPoint(x: 5.03906, y: 6.32812))
+        xPath.addLine(to: CGPoint(x: 0.390626, y: 1.67969))
+        xPath.addCurve(to: CGPoint(x: 0.390626, y: 0.390624), controlPoint1: CGPoint(x: 0, y: 1.32812), controlPoint2: CGPoint(x: 0, y: 0.742186))
+        xPath.addCurve(to: CGPoint(x: 1.67969, y: 0.390624), controlPoint1: CGPoint(x: 0.742189, y: 0), controlPoint2: CGPoint(x: 1.32813, y: 0))
+        xPath.addLine(to: CGPoint(x: 6.36719, y: 5.03906))
+        xPath.addLine(to: CGPoint(x: 11.0156, y: 0.390625))
+        xPath.addCurve(to: CGPoint(x: 12.3047, y: 0.390625), controlPoint1: CGPoint(x: 11.3672, y: 0), controlPoint2: CGPoint(x: 11.9531, y: 0))
+        xPath.addCurve(to: CGPoint(x: 12.3047, y: 1.71875), controlPoint1: CGPoint(x: 12.6953, y: 0.742187), controlPoint2: CGPoint(x: 12.6953, y: 1.32812))
+        xPath.addLine(to: CGPoint(x: 7.65625, y: 6.36719))
+        xPath.addLine(to: CGPoint(x: 12.3047, y: 11.0156))
+        xPath.addCurve(to: CGPoint(x: 12.3047, y: 12.3437), controlPoint1: CGPoint(x: 12.6953, y: 11.3672), controlPoint2: CGPoint(x: 12.6953, y: 11.9531))
+        xPath.addCurve(to: CGPoint(x: 10.9766, y: 12.3437), controlPoint1: CGPoint(x: 11.9531, y: 12.6953), controlPoint2: CGPoint(x: 11.3672, y: 12.6953))
+        xPath.addLine(to: CGPoint(x: 6.32813, y: 7.65625))
+        xPath.addLine(to: CGPoint(x: 1.67969, y: 12.3047))
+        xPath.addCurve(to: CGPoint(x: 0.351563, y: 12.3047), controlPoint1: CGPoint(x: 1.32813, y: 12.6953), controlPoint2: CGPoint(x: 0.742188, y: 12.6953))
+        xPath.addCurve(to: CGPoint(x: 0.351563, y: 11.0156), controlPoint1: CGPoint(x: 0, y: 11.9531), controlPoint2: CGPoint(x: 0, y: 11.3672))
+        xPath.close()
+        xPath.apply(CGAffineTransform(scaleX: closeSize / 13.0, y: closeSize / 13.0))
+        xLayer.path = xPath.cgPath
+        xLayer.fillColor = self.chevronColor.cgColor
+        if self.pipCloseStrokeWidth > 0 {
+            xLayer.strokeColor = self.chevronColor.cgColor
+            xLayer.lineWidth = self.pipCloseStrokeWidth
+            xLayer.lineJoin = .round
+        }
+        closeBtn.layer.addSublayer(xLayer)
+        containerView.addSubview(closeBtn)
+        self.closeButton = closeBtn
+
+        // Chevron-up — top-right — FA6 Pro Regular, viewBox 18x10, filled
+        let chevronScale: CGFloat = self.pipChevronSize / 18.0
+        let chevronW: CGFloat = self.pipChevronSize
+        let chevronH: CGFloat = self.pipChevronHeight ?? (10.0 * chevronScale)
+        let pathW: CGFloat = 18.0 * chevronScale
+        let pathH: CGFloat = 10.0 * chevronScale
+        let offsetX: CGFloat = (chevronW - pathW) / 2.0
+        let offsetY: CGFloat = (chevronH - pathH) / 2.0
         let chevronUp = UIView()
-        chevronUp.frame = CGRect(x: size.width - 35, y: 14, width: 15, height: 8)
+        chevronUp.frame = CGRect(x: size.width - chevronW - inset, y: inset, width: chevronW, height: chevronH)
         chevronUp.backgroundColor = .clear
         let chevronUpLayer = CAShapeLayer()
+        chevronUpLayer.frame = CGRect(x: 0, y: 0, width: chevronW, height: chevronH)
         let chevronUpPath = UIBezierPath()
-        chevronUpPath.move(to: CGPoint(x: 0, y: 6))
-        chevronUpPath.addLine(to: CGPoint(x: 7.5, y: 0))
-        chevronUpPath.addLine(to: CGPoint(x: 15, y: 6))
+        chevronUpPath.move(to: CGPoint(x: 7.89062, y: 0.351562))
+        chevronUpPath.addCurve(to: CGPoint(x: 9.17969, y: 0.351562), controlPoint1: CGPoint(x: 8.24219, y: 0), controlPoint2: CGPoint(x: 8.82812, y: 0))
+        chevronUpPath.addLine(to: CGPoint(x: 16.7188, y: 7.85156))
+        chevronUpPath.addCurve(to: CGPoint(x: 16.7188, y: 9.17969), controlPoint1: CGPoint(x: 17.0703, y: 8.24219), controlPoint2: CGPoint(x: 17.0703, y: 8.82812))
+        chevronUpPath.addCurve(to: CGPoint(x: 15.3906, y: 9.17969), controlPoint1: CGPoint(x: 16.3281, y: 9.57031), controlPoint2: CGPoint(x: 15.7422, y: 9.57031))
+        chevronUpPath.addLine(to: CGPoint(x: 8.55469, y: 2.34375))
+        chevronUpPath.addLine(to: CGPoint(x: 1.71875, y: 9.17969))
+        chevronUpPath.addCurve(to: CGPoint(x: 0.390625, y: 9.17969), controlPoint1: CGPoint(x: 1.32812, y: 9.57031), controlPoint2: CGPoint(x: 0.742188, y: 9.57031))
+        chevronUpPath.addCurve(to: CGPoint(x: 0.390625, y: 7.89062), controlPoint1: CGPoint(x: 0, y: 8.82812), controlPoint2: CGPoint(x: 0, y: 8.24219))
+        chevronUpPath.addLine(to: CGPoint(x: 7.89062, y: 0.351562))
+        chevronUpPath.close()
+        chevronUpPath.apply(CGAffineTransform(scaleX: chevronScale, y: chevronScale))
+        chevronUpPath.apply(CGAffineTransform(translationX: offsetX, y: offsetY))
         chevronUpLayer.path = chevronUpPath.cgPath
-        chevronUpLayer.strokeColor = self.chevronColor.cgColor
-        chevronUpLayer.fillColor = UIColor.clear.cgColor
-        chevronUpLayer.lineWidth = 2.0
-        chevronUpLayer.lineCap = .round
-        chevronUpLayer.lineJoin = .round
+        chevronUpLayer.fillColor = self.chevronColor.cgColor
+        if self.pipChevronStrokeWidth > 0 {
+            chevronUpLayer.strokeColor = self.chevronColor.cgColor
+            chevronUpLayer.lineWidth = self.pipChevronStrokeWidth
+            chevronUpLayer.lineJoin = .round
+        }
         chevronUp.layer.addSublayer(chevronUpLayer)
         containerView.addSubview(chevronUp)
         self.chevronUpView = chevronUp
         
         if let earnText = self.earnText, !earnText.isEmpty {
             let label = UILabel()
-            label.text = earnText
             label.textColor = self.earnTextColor
-            label.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+            if let fontFamily = self.earnTextFontFamily,
+               let customFont = UIFont(name: fontFamily, size: self.earnTextFontSize) {
+                label.font = customFont
+            } else {
+                label.font = UIFont.systemFont(ofSize: self.earnTextFontSize, weight: self.earnTextFontWeight)
+            }
             label.textAlignment = .center
-            label.backgroundColor = self.earnTextBackgroundColor
-            label.layer.cornerRadius = 4
-            label.clipsToBounds = true
+            if let bgColor = self.earnTextBackgroundColor {
+                label.backgroundColor = bgColor
+                label.layer.cornerRadius = 4
+                label.clipsToBounds = true
+            }
+            // Apply text with optional line height via attributed string
+            if let lineHeight = self.earnTextLineHeight {
+                let paragraphStyle = NSMutableParagraphStyle()
+                paragraphStyle.minimumLineHeight = lineHeight
+                paragraphStyle.maximumLineHeight = lineHeight
+                paragraphStyle.alignment = .center
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: label.font!,
+                    .foregroundColor: self.earnTextColor,
+                    .paragraphStyle: paragraphStyle
+                ]
+                label.attributedText = NSAttributedString(string: earnText, attributes: attributes)
+            } else {
+                label.text = earnText
+            }
             let labelWidth = earnText.size(withAttributes: [.font: label.font!]).width + 16
+            let labelHeight: CGFloat = self.earnTextLineHeight ?? (self.earnTextFontSize + 6)
             label.frame = CGRect(
                 x: (size.width - labelWidth) / 2,
-                y: size.height - 28,
+                y: size.height - self.earnTextMargin - labelHeight,
                 width: labelWidth,
-                height: 20
+                height: labelHeight
             )
             containerView.addSubview(label)
             self.earnLabel = label
@@ -701,6 +861,7 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         originalWebView = nil
         containerView = nil
         coverImageView = nil
+        closeButton = nil
         isMinimized = false
         
         // Reset drag state
@@ -708,6 +869,21 @@ class PictureInPictureManager: NSObject, ScrollVisibilityObserver {
         dragStartLocation = .zero
         pipWindowStartFrame = .zero
         lastPipPosition = nil
+    }
+
+    private static func parseFontWeight(_ value: String) -> UIFont.Weight {
+        switch value.lowercased() {
+        case "100": return .ultraLight
+        case "200": return .thin
+        case "300": return .light
+        case "normal", "400": return .regular
+        case "500": return .medium
+        case "600": return .semibold
+        case "bold", "700": return .bold
+        case "800": return .heavy
+        case "900": return .black
+        default: return .semibold
+        }
     }
 }
 
