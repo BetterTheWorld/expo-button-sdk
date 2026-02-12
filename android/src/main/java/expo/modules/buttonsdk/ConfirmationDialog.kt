@@ -295,6 +295,7 @@ object ConfirmationDialog {
         return Button(context).apply {
             this.text = text
             isAllCaps = false
+            transformationMethod = null
             setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSize)
             typeface = customTypeface ?: Typeface.DEFAULT
 
