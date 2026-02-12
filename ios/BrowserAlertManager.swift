@@ -214,7 +214,7 @@ class ExitConfirmationModalViewController: UIViewController {
             textColor: stayButtonTextColor,
             action: #selector(stayButtonTapped)
         )
-        stayButton.layer.borderWidth = 3
+        stayButton.layer.borderWidth = 2.5
         stayButton.layer.borderColor = buttonBorderColor.cgColor
 
         let leaveButton = createButton(
@@ -223,7 +223,7 @@ class ExitConfirmationModalViewController: UIViewController {
             textColor: leaveButtonTextColor,
             action: #selector(leaveButtonTapped)
         )
-        leaveButton.layer.borderWidth = 3
+        leaveButton.layer.borderWidth = 2.5
         leaveButton.layer.borderColor = buttonBorderColor.cgColor
         
         // Add views to hierarchy
@@ -241,9 +241,9 @@ class ExitConfirmationModalViewController: UIViewController {
             // Modal container - centered in screen with min 85% width
             modalContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             modalContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            modalContainer.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
-            modalContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
-            modalContainer.widthAnchor.constraint(greaterThanOrEqualTo: view.widthAnchor, multiplier: 0.65),
+            modalContainer.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 30),
+            modalContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -30),
+            modalContainer.widthAnchor.constraint(greaterThanOrEqualTo: view.widthAnchor, multiplier: 0.75),
             modalContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 500),
             
             // Content container padding
@@ -286,6 +286,9 @@ class ExitConfirmationModalViewController: UIViewController {
         button.setTitle(title, color: textColor)
         button.backgroundColor = backgroundColor
         button.titleLabel?.font = fontFamily.flatMap({ UIFont(name: $0, size: buttonFontSize) }) ?? UIFont.systemFont(ofSize: buttonFontSize, weight: .medium)
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
+        button.titleLabel?.adjustsFontSizeToFitWidth = true
+        button.titleLabel?.minimumScaleFactor = 0.75
         button.layer.cornerRadius = 20
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOffset = CGSize(width: 0, height: 1)

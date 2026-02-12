@@ -167,7 +167,7 @@ object ConfirmationDialog {
             ).apply {
                 addRule(RelativeLayout.CENTER_IN_PARENT)
                 // Add margins so modal doesn't touch screen edges
-                val marginPx = (40 * density).toInt()
+                val marginPx = (30 * density).toInt()
                 setMargins(marginPx, marginPx, marginPx, marginPx)
             }
 
@@ -307,8 +307,8 @@ object ConfirmationDialog {
 
             setTextColor(textColor)
 
-            val verticalPaddingPx = (2 * density).toInt()
-            val horizontalPaddingPx = (4 * density).toInt()
+            val verticalPaddingPx = (8 * density).toInt()
+            val horizontalPaddingPx = (12 * density).toInt()
             setPadding(horizontalPaddingPx, verticalPaddingPx, horizontalPaddingPx, verticalPaddingPx)
 
             // Override minimum dimensions
