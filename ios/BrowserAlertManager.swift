@@ -4,23 +4,45 @@ import Button
 class BrowserAlertManager {
     
     static func showExitConfirmationAlert(
-        browser: BrowserInterface, 
-        title: String?, 
+        browser: BrowserInterface,
+        title: String?,
         message: String?,
         stayButtonLabel: String?,
         leaveButtonLabel: String?,
+        titleColor: UIColor?,
+        stayButtonTextColor: UIColor?,
+        stayButtonBackgroundColor: UIColor?,
+        leaveButtonTextColor: UIColor?,
+        leaveButtonBackgroundColor: UIColor?,
+        buttonBorderColor: UIColor?,
+        fontFamily: String?,
+        messageColor: UIColor?,
+        titleFontSize: CGFloat?,
+        messageFontSize: CGFloat?,
+        buttonFontSize: CGFloat?,
         completion: @escaping (Bool) -> Void
     ) {
 #if DEBUG
         print("expo-button-sdk showExitConfirmationAlert called")
 #endif
-        
+
         DispatchQueue.main.async {
             let modalViewController = ExitConfirmationModalViewController(
                 title: title ?? "Are you sure you want to leave?",
                 message: message ?? "You may lose your progress and any available deals.",
                 stayButtonLabel: stayButtonLabel ?? "Stay",
                 leaveButtonLabel: leaveButtonLabel ?? "Leave",
+                titleColor: titleColor,
+                stayButtonTextColor: stayButtonTextColor,
+                stayButtonBackgroundColor: stayButtonBackgroundColor,
+                leaveButtonTextColor: leaveButtonTextColor,
+                leaveButtonBackgroundColor: leaveButtonBackgroundColor,
+                buttonBorderColor: buttonBorderColor,
+                fontFamily: fontFamily,
+                messageColor: messageColor,
+                titleFontSize: titleFontSize,
+                messageFontSize: messageFontSize,
+                buttonFontSize: buttonFontSize,
                 completion: completion
             )
             
@@ -80,18 +102,57 @@ class BrowserAlertManager {
 
 // MARK: - ExitConfirmationModalViewController
 class ExitConfirmationModalViewController: UIViewController {
-    
+
     private let titleText: String
     private let messageText: String
     private let stayButtonLabel: String
     private let leaveButtonLabel: String
+    private let titleColor: UIColor
+    private let stayButtonTextColor: UIColor
+    private let stayButtonBgColor: UIColor
+    private let leaveButtonTextColor: UIColor
+    private let leaveButtonBgColor: UIColor
+    private let buttonBorderColor: UIColor
+    private let fontFamily: String?
+    private let messageColor: UIColor
+    private let titleFontSize: CGFloat
+    private let messageFontSize: CGFloat
+    private let buttonFontSize: CGFloat
     private let completion: (Bool) -> Void
-    
-    init(title: String, message: String, stayButtonLabel: String, leaveButtonLabel: String, completion: @escaping (Bool) -> Void) {
+
+    init(
+        title: String,
+        message: String,
+        stayButtonLabel: String,
+        leaveButtonLabel: String,
+        titleColor: UIColor?,
+        stayButtonTextColor: UIColor?,
+        stayButtonBackgroundColor: UIColor?,
+        leaveButtonTextColor: UIColor?,
+        leaveButtonBackgroundColor: UIColor?,
+        buttonBorderColor: UIColor?,
+        fontFamily: String?,
+        messageColor: UIColor?,
+        titleFontSize: CGFloat?,
+        messageFontSize: CGFloat?,
+        buttonFontSize: CGFloat?,
+        completion: @escaping (Bool) -> Void
+    ) {
         self.titleText = title
         self.messageText = message
         self.stayButtonLabel = stayButtonLabel
         self.leaveButtonLabel = leaveButtonLabel
+        self.titleColor = titleColor ?? UIColor(red: 0.111, green: 0.111, blue: 0.111, alpha: 1.0)
+        self.stayButtonTextColor = stayButtonTextColor ?? .white
+        self.stayButtonBgColor = stayButtonBackgroundColor ?? UIColor(red: 0.027, green: 0.290, blue: 0.482, alpha: 1.0)
+        self.leaveButtonTextColor = leaveButtonTextColor ?? UIColor(red: 0.404, green: 0.427, blue: 0.455, alpha: 1.0)
+        self.leaveButtonBgColor = leaveButtonBackgroundColor ?? .white
+        self.buttonBorderColor = buttonBorderColor ?? UIColor(red: 0.827, green: 0.843, blue: 0.859, alpha: 1.0)
+        self.fontFamily = fontFamily
+        self.messageColor = messageColor ?? UIColor(red: 0.156, green: 0.163, blue: 0.176, alpha: 1.0)
+        self.titleFontSize = titleFontSize ?? 20
+        self.messageFontSize = messageFontSize ?? 14
+        self.buttonFontSize = buttonFontSize ?? 14
         self.completion = completion
         super.init(nibName: nil, bundle: nil)
     }
@@ -126,17 +187,17 @@ class ExitConfirmationModalViewController: UIViewController {
         
         let titleLabel = UILabel()
         titleLabel.text = titleText
-        titleLabel.font = UIFont.boldSystemFont(ofSize: 20)
-        titleLabel.textColor = UIColor(red: 0.111, green: 0.111, blue: 0.111, alpha: 1.0)
+        titleLabel.font = fontFamily.flatMap({ UIFont(name: $0, size: titleFontSize) }) ?? UIFont.boldSystemFont(ofSize: titleFontSize)
+        titleLabel.textColor = titleColor
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 0
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
+
         // Subtitle
         let subtitleLabel = UILabel()
         subtitleLabel.text = messageText
-        subtitleLabel.font = UIFont.systemFont(ofSize: 14)
-        subtitleLabel.textColor = UIColor(red: 0.156, green: 0.163, blue: 0.176, alpha: 1.0)
+        subtitleLabel.font = fontFamily.flatMap({ UIFont(name: $0, size: messageFontSize) }) ?? UIFont.systemFont(ofSize: messageFontSize)
+        subtitleLabel.textColor = messageColor
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -149,19 +210,21 @@ class ExitConfirmationModalViewController: UIViewController {
         
         let stayButton = createButton(
             title: stayButtonLabel,
-            backgroundColor: UIColor(red: 0.027, green: 0.290, blue: 0.482, alpha: 1.0),
-            textColor: .white,
+            backgroundColor: stayButtonBgColor,
+            textColor: stayButtonTextColor,
             action: #selector(stayButtonTapped)
         )
-        
+        stayButton.layer.borderWidth = 3
+        stayButton.layer.borderColor = buttonBorderColor.cgColor
+
         let leaveButton = createButton(
             title: leaveButtonLabel,
-            backgroundColor: UIColor.white,
-            textColor: UIColor(red: 0.404, green: 0.427, blue: 0.455, alpha: 1.0),
+            backgroundColor: leaveButtonBgColor,
+            textColor: leaveButtonTextColor,
             action: #selector(leaveButtonTapped)
         )
-        leaveButton.layer.borderWidth = 1
-        leaveButton.layer.borderColor = UIColor(red: 0.827, green: 0.843, blue: 0.859, alpha: 1.0).cgColor
+        leaveButton.layer.borderWidth = 3
+        leaveButton.layer.borderColor = buttonBorderColor.cgColor
         
         // Add views to hierarchy
         view.addSubview(modalContainer)
@@ -170,17 +233,17 @@ class ExitConfirmationModalViewController: UIViewController {
         titleSection.addSubview(titleLabel)
         titleSection.addSubview(subtitleLabel)
         contentContainer.addSubview(buttonContainer)
-        buttonContainer.addArrangedSubview(stayButton)
         buttonContainer.addArrangedSubview(leaveButton)
+        buttonContainer.addArrangedSubview(stayButton)
         
         // Setup constraints
         NSLayoutConstraint.activate([
             // Modal container - centered in screen with min 85% width
             modalContainer.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             modalContainer.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            modalContainer.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
-            modalContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
-            modalContainer.widthAnchor.constraint(greaterThanOrEqualTo: view.widthAnchor, multiplier: 0.85),
+            modalContainer.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            modalContainer.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
+            modalContainer.widthAnchor.constraint(greaterThanOrEqualTo: view.widthAnchor, multiplier: 0.65),
             modalContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 500),
             
             // Content container padding
@@ -222,8 +285,8 @@ class ExitConfirmationModalViewController: UIViewController {
         let button = UIButton(type: .custom)
         button.setTitle(title, color: textColor)
         button.backgroundColor = backgroundColor
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        button.layer.cornerRadius = 8
+        button.titleLabel?.font = fontFamily.flatMap({ UIFont(name: $0, size: buttonFontSize) }) ?? UIFont.systemFont(ofSize: buttonFontSize, weight: .medium)
+        button.layer.cornerRadius = 20
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOffset = CGSize(width: 0, height: 1)
         button.layer.shadowOpacity = 0.05
