@@ -4,6 +4,36 @@ export interface ExitConfirmationConfig {
   message?: string;
   stayButtonLabel?: string;
   leaveButtonLabel?: string;
+  /** Color of exit confirmation title.
+   * @default "#1C1C1C" */
+  titleColor?: string;
+  /** Text color of stay button.
+   * @default "#FFFFFF" */
+  stayButtonTextColor?: string;
+  /** Background color of stay button.
+   * @default "#074a7b" */
+  stayButtonBackgroundColor?: string;
+  /** Text color of leave button.
+   * @default "#677080" */
+  leaveButtonTextColor?: string;
+  /** Background color of leave button.
+   * @default "#FFFFFF" */
+  leaveButtonBackgroundColor?: string;
+  /** Border/line color for buttons.
+   * @default "#D3D9E0" */
+  buttonBorderColor?: string;
+  /** Color of exit confirmation message/body text.
+   * @default "#282B30" (Android) / rgba(40,42,45) (iOS) */
+  messageColor?: string;
+  /** Font size for the title.
+   * @default 20 */
+  titleFontSize?: number;
+  /** Font size for the message/body text.
+   * @default 14 */
+  messageFontSize?: number;
+  /** Font size for the button labels.
+   * @default 14 (iOS) / 12 (Android) */
+  buttonFontSize?: number;
 }
 
 export interface Promotion {
@@ -137,6 +167,10 @@ export interface CoverImageConfig {
 export interface StartPurchasePathOptions {
   url: string;
   token: string;
+  /** General font family applied to exit confirmation text and PiP earn text fallback.
+   * Must be a font bundled in the host app.
+   * Example: "OpenSans-SemiBold" */
+  fontFamily?: string;
   headerTitle?: string;
   headerSubtitle?: string;
   headerTitleColor?: string;

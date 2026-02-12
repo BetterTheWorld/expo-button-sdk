@@ -173,6 +173,18 @@ class ExpoButtonSdkModule() : Module() {
     private val exitConfirmationMessage: String
     private val stayButtonLabel: String
     private val leaveButtonLabel: String
+    private val exitTitleColor: Int?
+    private val exitStayButtonTextColor: Int?
+    private val exitStayButtonBackgroundColor: Int?
+    private val exitLeaveButtonTextColor: Int?
+    private val exitLeaveButtonBackgroundColor: Int?
+    private val exitButtonBorderColor: Int?
+    private val exitMessageColor: Int?
+    private val exitTitleFontSize: Float?
+    private val exitMessageFontSize: Float?
+    private val exitButtonFontSize: Float?
+    // General font family
+    private val fontFamily: String?
     private val closeOnPromotionClick: Boolean
 
     // Promotion labels
@@ -187,12 +199,25 @@ class ExpoButtonSdkModule() : Module() {
     private var pictureInPictureManager: PictureInPictureManager? = null
 
     init {
+      // Parse top-level fontFamily
+      fontFamily = options["fontFamily"] as? String
+
       val exitConfirmationConfig = options["exitConfirmation"] as? Map<String, Any>
       exitConfirmationEnabled = exitConfirmationConfig?.get("enabled") as? Boolean ?: false
       exitConfirmationTitle = exitConfirmationConfig?.get("title") as? String ?: "Are you sure you want to leave?"
       exitConfirmationMessage = exitConfirmationConfig?.get("message") as? String ?: "You may lose your progress and any available deals."
       stayButtonLabel = exitConfirmationConfig?.get("stayButtonLabel") as? String ?: "Stay"
       leaveButtonLabel = exitConfirmationConfig?.get("leaveButtonLabel") as? String ?: "Leave"
+      exitTitleColor = parseColorNullable(exitConfirmationConfig?.get("titleColor") as? String)
+      exitStayButtonTextColor = parseColorNullable(exitConfirmationConfig?.get("stayButtonTextColor") as? String)
+      exitStayButtonBackgroundColor = parseColorNullable(exitConfirmationConfig?.get("stayButtonBackgroundColor") as? String)
+      exitLeaveButtonTextColor = parseColorNullable(exitConfirmationConfig?.get("leaveButtonTextColor") as? String)
+      exitLeaveButtonBackgroundColor = parseColorNullable(exitConfirmationConfig?.get("leaveButtonBackgroundColor") as? String)
+      exitButtonBorderColor = parseColorNullable(exitConfirmationConfig?.get("buttonBorderColor") as? String)
+      exitMessageColor = parseColorNullable(exitConfirmationConfig?.get("messageColor") as? String)
+      exitTitleFontSize = (exitConfirmationConfig?.get("titleFontSize") as? Number)?.toFloat()
+      exitMessageFontSize = (exitConfirmationConfig?.get("messageFontSize") as? Number)?.toFloat()
+      exitButtonFontSize = (exitConfirmationConfig?.get("buttonFontSize") as? Number)?.toFloat()
 
       closeOnPromotionClick = options["closeOnPromotionClick"] as? Boolean ?: true
 
@@ -224,13 +249,24 @@ class ExpoButtonSdkModule() : Module() {
       if (pipConfig?.get("enabled") == true) {
         val currentActivity = activityRef.get()
         if (currentActivity != null) {
-          pictureInPictureManager = PictureInPictureManager(currentActivity, options)
+          // PiP font fallback: if fontFamily is set and earnTextFontFamily is NOT set, inject fallback
+          val pipOptions = if (fontFamily != null && pipConfig["earnTextFontFamily"] == null && animationConfig != null) {
+            val updatedPipConfig = pipConfig.toMutableMap().apply { put("earnTextFontFamily", fontFamily) }
+            val updatedAnimConfig = animationConfig.toMutableMap().apply { put("pictureInPicture", updatedPipConfig) }
+            options.toMutableMap().apply { put("animationConfig", updatedAnimConfig) }
+          } else {
+            options
+          }
+          pictureInPictureManager = PictureInPictureManager(currentActivity, pipOptions)
           currentPictureInPictureManager = pictureInPictureManager
         }
       }
     }
 
     override fun onInitialized(browser: BrowserInterface) {
+      // Reset flag so exit confirmation works immediately
+      isNewPurchasePathStarting = false
+
       GlobalLoaderManager.getInstance().hideLoader()
 
       promotionManager?.showPendingPromoCodeToast()
@@ -263,7 +299,15 @@ class ExpoButtonSdkModule() : Module() {
         if (pipConfig?.get("enabled") == true) {
           val currentActivity = activityRef.get()
           if (currentActivity != null) {
-            pictureInPictureManager = PictureInPictureManager(currentActivity, options)
+            // PiP font fallback
+            val pipOptions = if (fontFamily != null && pipConfig["earnTextFontFamily"] == null && animationConfig != null) {
+              val updatedPipConfig = pipConfig.toMutableMap().apply { put("earnTextFontFamily", fontFamily) }
+              val updatedAnimConfig = animationConfig.toMutableMap().apply { put("pictureInPicture", updatedPipConfig) }
+              options.toMutableMap().apply { put("animationConfig", updatedAnimConfig) }
+            } else {
+              options
+            }
+            pictureInPictureManager = PictureInPictureManager(currentActivity, pipOptions)
             currentPictureInPictureManager = pictureInPictureManager
           }
         }
@@ -313,6 +357,15 @@ class ExpoButtonSdkModule() : Module() {
       }
     }
 
+    private fun parseColorNullable(colorString: String?): Int? {
+      if (colorString == null) return null
+      return try {
+        Color.parseColor(colorString)
+      } catch (e: IllegalArgumentException) {
+        null
+      }
+    }
+
     override fun onStartNavigate(browser: BrowserInterface) {}
     override fun onPageNavigate(browser: BrowserInterface, page: BrowserPage) {}
     override fun onProductNavigate(browser: BrowserInterface, page: ProductPage) {}
@@ -350,7 +403,18 @@ class ExpoButtonSdkModule() : Module() {
             exitConfirmationMessage,
             stayButtonLabel,
             leaveButtonLabel,
-            browserInterface
+            browserInterface,
+            titleColor = exitTitleColor,
+            stayButtonTextColor = exitStayButtonTextColor,
+            stayButtonBackgroundColor = exitStayButtonBackgroundColor,
+            leaveButtonTextColor = exitLeaveButtonTextColor,
+            leaveButtonBackgroundColor = exitLeaveButtonBackgroundColor,
+            buttonBorderColor = exitButtonBorderColor,
+            fontFamily = fontFamily,
+            messageColor = exitMessageColor,
+            titleFontSize = exitTitleFontSize,
+            messageFontSize = exitMessageFontSize,
+            buttonFontSize = exitButtonFontSize
           )
           return false
         }

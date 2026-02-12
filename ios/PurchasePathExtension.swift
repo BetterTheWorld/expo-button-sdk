@@ -17,6 +17,18 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     var exitConfirmationMessage: String?
     var stayButtonLabel: String?
     var leaveButtonLabel: String?
+    var exitTitleColor: UIColor?
+    var exitStayButtonTextColor: UIColor?
+    var exitStayButtonBackgroundColor: UIColor?
+    var exitLeaveButtonTextColor: UIColor?
+    var exitLeaveButtonBackgroundColor: UIColor?
+    var exitButtonBorderColor: UIColor?
+    var exitMessageColor: UIColor?
+    var exitTitleFontSize: CGFloat?
+    var exitMessageFontSize: CGFloat?
+    var exitButtonFontSize: CGFloat?
+    // General font family
+    var fontFamily: String?
     // Promotion manager
     private var promotionManager: PromotionManager?
     var closeOnPromotionClick: Bool = true
@@ -42,6 +54,9 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         self.footerBackgroundColor = (options["footerBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
         self.footerTintColor = (options["footerTintColor"] as? String).flatMap { UIColor(hex: $0) }
         
+        // Parse top-level fontFamily
+        self.fontFamily = options["fontFamily"] as? String
+
         // Parse exit confirmation config
         if let exitConfirmationConfig = options["exitConfirmation"] as? NSDictionary {
             self.exitConfirmationEnabled = exitConfirmationConfig["enabled"] as? Bool ?? false
@@ -49,6 +64,16 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
             self.exitConfirmationMessage = exitConfirmationConfig["message"] as? String
             self.stayButtonLabel = exitConfirmationConfig["stayButtonLabel"] as? String
             self.leaveButtonLabel = exitConfirmationConfig["leaveButtonLabel"] as? String
+            self.exitTitleColor = (exitConfirmationConfig["titleColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitStayButtonTextColor = (exitConfirmationConfig["stayButtonTextColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitStayButtonBackgroundColor = (exitConfirmationConfig["stayButtonBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitLeaveButtonTextColor = (exitConfirmationConfig["leaveButtonTextColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitLeaveButtonBackgroundColor = (exitConfirmationConfig["leaveButtonBackgroundColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitButtonBorderColor = (exitConfirmationConfig["buttonBorderColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitMessageColor = (exitConfirmationConfig["messageColor"] as? String).flatMap { UIColor(hex: $0) }
+            self.exitTitleFontSize = exitConfirmationConfig["titleFontSize"] as? CGFloat
+            self.exitMessageFontSize = exitConfirmationConfig["messageFontSize"] as? CGFloat
+            self.exitButtonFontSize = exitConfirmationConfig["buttonFontSize"] as? CGFloat
         }
         
         // Parse closeOnPromotionClick option (default: true)
@@ -186,7 +211,20 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         }
         
         if pipEnabled {
-            let optionsDict = options as? [String: Any] ?? [:]
+            var optionsDict = options as? [String: Any] ?? [:]
+
+            // PiP font fallback: if fontFamily is set and earnTextFontFamily is NOT set, inject fallback
+            if let fontFamily = self.fontFamily {
+                if var animConfig = optionsDict["animationConfig"] as? [String: Any],
+                   var pipConfig = animConfig["pictureInPicture"] as? [String: Any] {
+                    if pipConfig["earnTextFontFamily"] == nil {
+                        pipConfig["earnTextFontFamily"] = fontFamily
+                        animConfig["pictureInPicture"] = pipConfig
+                        optionsDict["animationConfig"] = animConfig
+                    }
+                }
+            }
+
             pipManager = PictureInPictureManager(options: optionsDict)
             pipManager?.addMinimizeButton(to: browser)
         }
@@ -270,11 +308,22 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         if exitConfirmationEnabled {
             // Use the new BrowserAlertManager with configurable labels
             BrowserAlertManager.showExitConfirmationAlert(
-                browser: browser, 
-                title: self.exitConfirmationTitle, 
+                browser: browser,
+                title: self.exitConfirmationTitle,
                 message: self.exitConfirmationMessage,
                 stayButtonLabel: self.stayButtonLabel,
-                leaveButtonLabel: self.leaveButtonLabel
+                leaveButtonLabel: self.leaveButtonLabel,
+                titleColor: self.exitTitleColor,
+                stayButtonTextColor: self.exitStayButtonTextColor,
+                stayButtonBackgroundColor: self.exitStayButtonBackgroundColor,
+                leaveButtonTextColor: self.exitLeaveButtonTextColor,
+                leaveButtonBackgroundColor: self.exitLeaveButtonBackgroundColor,
+                buttonBorderColor: self.exitButtonBorderColor,
+                fontFamily: self.fontFamily,
+                messageColor: self.exitMessageColor,
+                titleFontSize: self.exitTitleFontSize,
+                messageFontSize: self.exitMessageFontSize,
+                buttonFontSize: self.exitButtonFontSize
             ) { shouldLeave in
                 if shouldLeave {
                     browser.dismiss()

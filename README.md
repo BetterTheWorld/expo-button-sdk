@@ -264,13 +264,59 @@ Show a confirmation dialog when users try to leave the purchase path:
 startPurchasePath({
   url: "https://the.button.url",
   token: "my-tracking-token",
+  fontFamily: "OpenSans-SemiBold", // Applied to exit dialog & PiP earn text fallback
   exitConfirmation: {
     enabled: true,
-    title: "Leave Shopping?",
-    message: "Are you sure you want to leave? You might miss out on cashback.",
-    stayButtonLabel: "Stay",
-    leaveButtonLabel: "Leave"
+    title: "Return to My App?",
+    message: "If you made a purchase, you'll receive an email confirming your earnings.",
+    stayButtonLabel: "Keep Shopping",
+    leaveButtonLabel: "Yes, Return",
+    titleColor: "#074A7B",
+    messageColor: "#555555",
+    stayButtonTextColor: "#FFFFFF",
+    stayButtonBackgroundColor: "#074A7B",
+    leaveButtonTextColor: "#074A7B",
+    leaveButtonBackgroundColor: "#FFFFFF",
+    buttonBorderColor: "#074A7B",
+    titleFontSize: 22,
+    messageFontSize: 15,
+    buttonFontSize: 14,
   }
+});
+```
+
+#### Exit Confirmation Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | — | Enable the exit confirmation dialog |
+| `title` | `string?` | `"Are you sure you want to leave?"` | Dialog title text |
+| `message` | `string?` | `"You may lose your progress..."` | Dialog body text |
+| `stayButtonLabel` | `string?` | `"Stay"` | Label for the stay button (right) |
+| `leaveButtonLabel` | `string?` | `"Leave"` | Label for the leave button (left) |
+| `titleColor` | `string?` | `"#1C1C1C"` | Color of the title text |
+| `messageColor` | `string?` | `"#282B30"` | Color of the body/message text |
+| `stayButtonTextColor` | `string?` | `"#FFFFFF"` | Text color of the stay button |
+| `stayButtonBackgroundColor` | `string?` | `"#074a7b"` | Background color of the stay button |
+| `leaveButtonTextColor` | `string?` | `"#677080"` | Text color of the leave button |
+| `leaveButtonBackgroundColor` | `string?` | `"#FFFFFF"` | Background color of the leave button |
+| `buttonBorderColor` | `string?` | `"#D3D9E0"` | Border color applied to both buttons |
+| `titleFontSize` | `number?` | `20` | Font size for the title |
+| `messageFontSize` | `number?` | `14` | Font size for the body text |
+| `buttonFontSize` | `number?` | `14` (iOS) / `12` (Android) | Font size for button labels |
+
+#### Font Family
+
+The top-level `fontFamily` prop applies a custom font to all exit confirmation text (title, message, buttons). It also serves as a fallback for the PiP `earnTextFontFamily` — if `fontFamily` is set but `earnTextFontFamily` is not, the PiP earn text will use `fontFamily`.
+
+The font must be bundled in the host app. On iOS it is loaded via `UIFont(name:size:)`. On Android it looks for `fonts/<name>.ttf` then `.otf` in assets (react-native linking), then `<name>.ttf` / `.otf` at the asset root (expo-font).
+
+```typescript
+startPurchasePath({
+  url: "...",
+  token: "...",
+  fontFamily: "OpenSans-SemiBold", // Applied to exit dialog + PiP earn text fallback
+  // ...
 });
 ```
 

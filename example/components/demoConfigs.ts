@@ -404,12 +404,20 @@ export const DEMO_CONFIGS: DemoConfig[] = [
         backgroundColor: "#FFFFFF",
         padding: 22,
       },
+      fontFamily: "OpenSans-SemiBold",
       exitConfirmation: {
         enabled: true,
-        title: "Are you sure you want to leave?",
-        message: "You might miss out on exclusive offers.",
-        stayButtonLabel: "Stay",
-        leaveButtonLabel: "Leave",
+        title: "Return to My App?",
+        message:
+          "If you made a purchase at Nike, you'll receive an email confirming your online earnings in 24 hours.",
+        stayButtonLabel: "Keep Shopping",
+        leaveButtonLabel: "Yes, Return",
+        titleColor: "#074A7B",
+        stayButtonTextColor: "#FFFFFF",
+        stayButtonBackgroundColor: "#074A7B",
+        leaveButtonTextColor: "#074A7B",
+        leaveButtonBackgroundColor: "#FFFFFF",
+        buttonBorderColor: "#074A7B",
       },
       onClose: () => {
         // Alert.alert("Browser closed");
