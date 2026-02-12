@@ -372,30 +372,25 @@ class ExpoButtonSdkModule() : Module() {
     override fun onPurchaseNavigate(browser: BrowserInterface, page: PurchasePage) {}
 
     override fun onShouldClose(browserInterface: BrowserInterface): Boolean {
-      Log.d("CustomPurchasePathExtension", "onShouldClose called")
+      Log.d("CustomPurchasePathExtension", "onShouldClose called - exitConfirmationEnabled=$exitConfirmationEnabled, isNewPurchasePathStarting=$isNewPurchasePathStarting, isSimPipDismissing=$isSimPipDismissing")
 
-      // Simulated PiP is dismissing the browser - allow it silently
+      // Simulated PiP is dismissing the browser programmatically - allow it silently
       if (isSimPipDismissing) {
         Log.d("CustomPurchasePathExtension", "Simulated PiP dismissing - allowing close")
         return true
       }
 
-      // New purchase path starting - allow system closure
-      if (isNewPurchasePathStarting) {
-        Log.d("CustomPurchasePathExtension", "New purchase path starting - allowing close")
-        isNewPurchasePathStarting = false
-        return true
-      }
-
-      // PiP closing for new content
+      // PiP closing for new content (programmatic)
       val pipManager = pictureInPictureManager ?: currentPictureInPictureManager
       if (pipManager != null && pipManager.isClosingForNewContent()) {
+        Log.d("CustomPurchasePathExtension", "PiP closing for new content - allowing close")
         return true
       }
 
-      // Show exit confirmation if enabled
+      // Exit confirmation ALWAYS takes priority over other flags when enabled
       if (exitConfirmationEnabled) {
         val currentActivity = activityRef.get()
+        Log.d("CustomPurchasePathExtension", "Exit confirmation enabled, activity=${currentActivity != null}")
         if (currentActivity != null) {
           ConfirmationDialog.show(
             currentActivity,
@@ -419,6 +414,14 @@ class ExpoButtonSdkModule() : Module() {
           return false
         }
       }
+
+      // New purchase path starting - allow system closure (only when no exit confirmation)
+      if (isNewPurchasePathStarting) {
+        Log.d("CustomPurchasePathExtension", "New purchase path starting - allowing close")
+        isNewPurchasePathStarting = false
+        return true
+      }
+
       return true
     }
 
