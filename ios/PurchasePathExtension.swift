@@ -98,6 +98,7 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     
     private var cleanupCompletion: (() -> Void)?
     private var closeCallback: (() -> Void)?
+    private var isCleaningUp: Bool = false
     
     func setPromotionClickCallback(_ callback: @escaping (String, BrowserInterface?) -> Void) {
         promotionManager?.setOnPromotionClickCallback(callback)
@@ -118,8 +119,10 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
         
         pipManager?.cleanup()
         pipManager = nil
-        
+
         if let browser = currentBrowser {
+            // Mark as cleaning up so browserDidClose won't fire closeCallback
+            self.isCleaningUp = true
             // Store completion block to be called in browserDidClose
             self.cleanupCompletion = completion
             browser.dismiss()
@@ -278,19 +281,24 @@ class PurchasePathExtensionCustom: NSObject, PurchasePathExtension {
     
     func browserDidClose() {
         print("expo-button-sdk browserDidClose")
-        
+
         // Clean up PiP resources when browser closes
         pipManager?.cleanup()
         pipManager = nil
-        
+
         // Clean up references
         currentBrowser = nil
-        
+
         print("🔄 Browser closed - loader management delegated to navigation methods")
-        
-        // Notify close callback
-        closeCallback?()
-        
+
+        // Only notify close callback if this is a user-initiated close, not a programmatic cleanup
+        if !isCleaningUp {
+            closeCallback?()
+        }
+
+        // Reset flag
+        isCleaningUp = false
+
         // Execute pending completion block if any (e.g. from cleanup() call)
         // We add a small delay to ensure the UI hierarchy is fully stable for a new presentation
         if let completion = self.cleanupCompletion {
